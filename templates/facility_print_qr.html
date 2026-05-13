@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <title>In Tem QR - Smart Lab</title>
+    <style>
+        /* Cấu hình cho giấy in */
+        body { font-family: Arial, sans-serif; background: #eee; margin: 0; padding: 20px; }
+        .print-container { background: white; width: 210mm; /* Khổ A4 */ min-height: 297mm; margin: 0 auto; padding: 10mm; box-shadow: 0 0 10px rgba(0,0,0,0.1); display: flex; flex-wrap: wrap; align-content: flex-start; }
+        
+        /* Cấu hình từng cái tem dán */
+        .qr-sticker { width: 40mm; height: 50mm; margin: 5mm; text-align: center; border: 1px dashed #ccc; padding-top: 5mm; box-sizing: border-box; }
+        .qr-sticker img { width: 30mm; height: 30mm; }
+        .qr-sticker .name { font-size: 10px; font-weight: bold; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0 2px; }
+        .qr-sticker .code { font-size: 10px; color: #555; }
+        
+        /* Ẩn các nút bấm khi máy in bắt đầu in */
+        @media print {
+            body { background: white; padding: 0; }
+            .print-container { box-shadow: none; margin: 0; width: auto; }
+            .no-print { display: none !important; }
+        }
+        
+        .btn-print { display: block; width: 200px; margin: 0 auto 20px auto; padding: 10px 20px; background: #007bff; color: white; text-align: center; text-decoration: none; border-radius: 5px; font-weight: bold; cursor: pointer; border: none; font-size: 16px; }
+    </style>
+</head>
+<body>
+
+    <button class="btn-print no-print" onclick="window.print()">🖨️ Bấm vào đây để IN NGAY</button>
+    
+    <div class="text-center no-print" style="text-align: center; margin-bottom: 20px;">
+        <a href="/admin/facility/device/">⬅️ Quay lại trang Quản lý</a>
+    </div>
+
+    <div class="print-container">
+        {% for device in devices %}
+        <div class="qr-sticker">
+            <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ device.device_code }}" alt="QR Code">
+            <div class="name">{{ device.name }}</div>
+            <div class="code">{{ device.device_code }}</div>
+        </div>
+        {% endfor %}
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,300 @@
+{% extends 'base.html' %}
+{% load humanize %}
+{% block title %}Tổng quan Quản trị - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    .hover-lift { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .hover-lift:hover { transform: translateY(-5px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15) !important; }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+    
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-primary d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Bảng Điều Khiển (Dashboard)</h4>
+            <p class="text-muted mb-0 small">Xin chào <strong class="text-primary">{{ request.user.first_name|default:request.user.username }}</strong>.</p>
+        </div>
+        <div>
+            <span class="badge bg-light text-dark border shadow-sm px-4 py-2 fs-6 rounded-pill"><i class="bi bi-calendar-check text-success me-2"></i>Hôm nay: {% now "d/m/Y" %}</span>
+        </div>
+    </div>
+
+    {% if request.user.role == 'sales' or request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+    <div class="mb-5">
+        
+        <div class="mb-4 bg-white p-3 rounded-4 shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-graph-up-arrow text-primary me-2"></i> Thống kê Kinh doanh</h5>
+            
+            <form method="GET" action="" class="m-0 d-flex flex-column flex-md-row gap-2">
+                <input type="hidden" name="facility_filter" value="{{ facility_filter|default:'today' }}">
+                {% if facility_staff_filter and facility_staff_filter != 'all' %}
+                <input type="hidden" name="facility_staff_filter" value="{{ facility_staff_filter }}">
+                {% endif %}
+                
+                {% if request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill"><i class="bi bi-person-badge text-muted"></i></span>
+                    <select name="sales_filter" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-end-pill fw-bold px-3" onchange="this.form.submit()">
+                        <option value="all">Tất cả Sales</option>
+                        {% for s in sales_users %}
+                            <option value="{{ s.id }}" {% if sales_filter == s.id|stringformat:"s" %}selected{% endif %}>{{ s.first_name|default:s.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill"><i class="bi bi-funnel-fill text-muted"></i></span>
+                    <select name="month" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-end-pill fw-bold px-4" onchange="this.form.submit()">
+                        <option value="all">Tất cả thời gian</option>
+                        {% for m in month_choices %}
+                            <option value="{{ m.value }}" {% if filter_month == m.value %}selected{% endif %}>{{ m.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <div class="row g-4">
+            
+            <div class="col-12 col-md-5 d-flex flex-column gap-4">
+                <div class="card border-0 shadow-sm hover-lift rounded-4 h-100">
+                    <div class="card-body p-4">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="fw-bold text-secondary mb-1">TỔNG LEADS (KHÁCH)</h6>
+                                <span class="badge bg-light text-primary border rounded-pill px-2">
+                                    {{ kpi_title }}
+                                </span>
+                            </div>
+                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;"><i class="bi bi-people-fill fs-5"></i></div>
+                        </div>
+                        <h2 class="fw-bold text-dark mt-2 mb-1">{{ total_leads }}</h2>
+                        <p class="text-success small mb-0 fw-bold"><i class="bi bi-check-circle-fill me-1"></i> {{ won_leads }} chốt thành công</p>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm hover-lift rounded-4 h-100" style="background: linear-gradient(135deg, #198754 0%, #20c997 100%);">
+                    <div class="card-body p-4 text-white">
+                        <div class="d-flex justify-content-between align-items-start mb-3">
+                            <div>
+                                <h6 class="fw-bold mb-1 text-white opacity-75">DOANH THU THỰC THU</h6>
+                                <span class="badge bg-white bg-opacity-25 text-white rounded-pill px-2 border-0">VNĐ</span>
+                            </div>
+                            <div class="bg-white bg-opacity-25 text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 45px; height: 45px;"><i class="bi bi-cash-coin fs-5"></i></div>
+                        </div>
+                        <h2 class="fw-bold text-white mt-2 mb-1">{{ total_revenue|intcomma|default:"0" }} đ</h2>
+                        <p class="small mb-0 opacity-75 fw-bold"><i class="bi bi-graph-up-arrow me-1"></i> Dựa trên các Deal thành công</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-7">
+                <div class="card border-0 shadow-sm h-100 rounded-4">
+                    <div class="card-body p-4">
+                        <h6 class="fw-bold text-dark mb-3">Tỷ lệ chuyển đổi Khách hàng</h6>
+                        {% if total_leads == 0 %}
+                            <div class="text-center py-5"><p class="text-muted mb-0">Chưa có dữ liệu khách hàng.</p></div>
+                        {% else %}
+                            <div style="position: relative; height: 280px; width: 100%;">
+                                <canvas id="leadChart"></canvas>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if request.user.role == 'facility' or request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+    <div class="mb-5">
+        
+        <div class="mb-4 bg-white p-3 rounded-4 shadow-sm d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <h5 class="fw-bold text-dark mb-0"><i class="bi bi-gear-fill text-danger me-2"></i> Vận hành cơ sở</h5>
+            
+            <form method="GET" action="" class="m-0 d-flex flex-column flex-md-row gap-2">
+                <input type="hidden" name="month" value="{{ filter_month|default:'all' }}">
+                {% if sales_filter and sales_filter != 'all' %}
+                <input type="hidden" name="sales_filter" value="{{ sales_filter }}">
+                {% endif %}
+
+                {% if request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill"><i class="bi bi-person-gear text-muted"></i></span>
+                    <select name="facility_staff_filter" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-end-pill fw-bold px-3" onchange="this.form.submit()">
+                        <option value="all">Tất cả NV Vận hành</option>
+                        {% for f in facility_users %}
+                            <option value="{{ f.id }}" {% if facility_staff_filter == f.id|stringformat:"s" %}selected{% endif %}>{{ f.first_name|default:f.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-0 rounded-start-pill"><i class="bi bi-calendar-range text-muted"></i></span>
+                    <select name="facility_filter" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-end-pill fw-bold px-4" onchange="this.form.submit()">
+                        <option value="today" {% if facility_filter == 'today' or not facility_filter %}selected{% endif %}>Hôm nay</option>
+                        <option value="week" {% if facility_filter == 'week' %}selected{% endif %}>Tuần này</option>
+                        <option value="month" {% if facility_filter == 'month' %}selected{% endif %}>Tháng này</option>
+                        <option value="year" {% if facility_filter == 'year' %}selected{% endif %}>Năm nay</option>
+                    </select>
+                </div>
+            </form>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 hover-lift rounded-4">
+                    <div class="card-body p-3 p-md-4 text-center">
+                        <div class="bg-success bg-opacity-10 text-success rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;"><i class="bi bi-person-check-fill fs-4"></i></div>
+                        <h6 class="fw-bold text-secondary mb-1">Học sinh Đến</h6>
+                        <h2 class="fw-bold text-dark mb-0">{{ students_present }}</h2>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 hover-lift rounded-4">
+                    <div class="card-body p-3 p-md-4 text-center">
+                        <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;"><i class="bi bi-person-x-fill fs-4"></i></div>
+                        <h6 class="fw-bold text-secondary mb-1">Học sinh Vắng</h6>
+                        <h2 class="fw-bold text-dark mb-0">{{ students_absent }}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 hover-lift rounded-4">
+                    <div class="card-body p-3 p-md-4 text-center">
+                        <div class="bg-info bg-opacity-10 text-info rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;"><i class="bi bi-box-arrow-up-right fs-4"></i></div>
+                        <h6 class="fw-bold text-secondary mb-1">Thiết bị Xuất ra</h6>
+                        <h2 class="fw-bold text-dark mb-0">{{ devices_borrowed }}</h2>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-6 col-lg-3">
+                <div class="card border-0 shadow-sm h-100 hover-lift rounded-4">
+                    <div class="card-body p-3 p-md-4 text-center">
+                        <div class="bg-secondary bg-opacity-10 text-secondary rounded-circle d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;"><i class="bi bi-box-arrow-in-down-left fs-4"></i></div>
+                        <h6 class="fw-bold text-secondary mb-1">Thiết bị Thu về</h6>
+                        <h2 class="fw-bold text-dark mb-0">{{ devices_returned }}</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm rounded-4">
+            <div class="card-body p-4">
+                <h6 class="fw-bold text-dark mb-3">Tình trạng Kho Smart Lab (Hiện tại)</h6>
+                <div style="position: relative; height: 300px; width: 100%;">
+                    <canvas id="deviceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        
+        // --- DATA CHO SALES ---
+        {% if request.user.role == 'sales' or request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+            const leadLabels = {{ lead_labels|safe|default:"[]" }};
+            const leadCounts = {{ lead_counts|safe|default:"[]" }};
+            const totalLeads = {{ total_leads|default:0 }};
+
+            // Hàm map màu tự động nhận diện chữ trong label để gán màu luôn chuẩn 100%
+            const backgroundColors = leadLabels.map(label => {
+                let text = label.toLowerCase();
+                if (text.includes('mới')) return '#0dcaf0';         // Xanh dương (Khách mới)
+                if (text.includes('tư vấn')) return '#ffc107';      // Vàng (Tư vấn)
+                if (text.includes('học thử')) return '#fd7e14';     // Cam (Học thử)
+                if (text.includes('chốt') || text.includes('thành công')) return '#198754'; // Xanh lá (Đã chốt)
+                return '#6c757d';                                   // Xám (Từ chối / Thất bại)
+            });
+
+            const centerTextPlugin = {
+                id: 'centerText',
+                beforeDraw: function(chart) {
+                    if (chart.config.type !== 'doughnut') return;
+                    var ctx = chart.ctx;
+                    var meta = chart.getDatasetMeta(0);
+                    if (meta.data.length > 0) {
+                        ctx.restore();
+                        var centerX = meta.data[0].x; 
+                        var centerY = meta.data[0].y;
+                        
+                        var text = totalLeads + " Khách";
+                        ctx.font = "bold 1.5rem sans-serif";
+                        ctx.textBaseline = "middle";
+                        ctx.fillStyle = "#212529";
+                        
+                        var textX = centerX - ctx.measureText(text).width / 2;
+                        ctx.fillText(text, textX, centerY);
+                        ctx.save();
+                    }
+                }
+            };
+            Chart.register(centerTextPlugin);
+
+            if (totalLeads > 0) {
+                new Chart(document.getElementById('leadChart').getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: leadLabels,
+                        datasets: [{
+                            data: leadCounts,
+                            backgroundColor: backgroundColors, // <--- Đã sửa ở đây: Dùng mảng màu map tự động
+                            borderWidth: 2, borderColor: '#ffffff'
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        layout: { padding: 15 },
+                        plugins: { 
+                            legend: { position: 'bottom', labels: { padding: 15, font: {weight: 'bold'} } } 
+                        },
+                        cutout: '70%' 
+                    }
+                });
+            }
+        {% endif %}
+
+        // --- DATA CHO VẬN HÀNH ---
+        {% if request.user.role == 'facility' or request.user.role == 'admin' or request.user.role == 'manager' or request.user.is_superuser %}
+            const deviceLabels = {{ device_labels|safe|default:"[]" }};
+            const deviceCounts = {{ device_counts|safe|default:"[]" }};
+
+            new Chart(document.getElementById('deviceChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: deviceLabels,
+                    datasets: [{
+                        label: 'Số lượng thiết bị',
+                        data: deviceCounts,
+                        backgroundColor: ['rgba(25, 135, 84, 0.8)', 'rgba(255, 193, 7, 0.8)', 'rgba(220, 53, 69, 0.8)'],
+                        borderRadius: 6, barPercentage: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { borderDash: [4, 4] } },
+                        x: { grid: { display: false }, ticks: { font: { weight: 'bold' } } }
+                    }
+                }
+            });
+        {% endif %}
+    });
+</script>
+{% endblock %}

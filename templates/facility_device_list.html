@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý Kho Thiết bị - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    .stat-card { border-radius: 12px; padding: 20px; transition: transform 0.2s; border: none; }
+    .stat-card:hover { transform: translateY(-5px); }
+    .stat-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 24px; }
+    .table-hover tbody tr:hover { background-color: #f8f9fa; }
+    .status-badge { width: 110px; text-align: center; display: inline-block;}
+    .qr-thumb { width: 40px; height: 40px; border: 1px solid #dee2e6; border-radius: 6px; padding: 2px; cursor: pointer; transition: 0.2s; }
+    .qr-thumb:hover { transform: scale(1.2); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-primary d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Quản lý Kho Thiết bị Smart Lab</h4>
+            <p class="text-muted mb-0 small">Kiểm kê thiết bị, nhập kho và theo dõi tình trạng mượn trả.</p>
+        </div>
+        <button class="btn btn-primary rounded-pill px-4 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#addDeviceModal">
+            <i class="bi bi-plus-circle me-2"></i>Nhập Kho
+        </button>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-md-3 col-6">
+            <div class="stat-card bg-white shadow-sm h-100 d-flex align-items-center">
+                <div class="stat-icon bg-primary bg-opacity-10 text-primary me-3"><i class="bi bi-box-seam-fill"></i></div>
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Tổng số lượng</div>
+                    <h3 class="fw-bold mb-0 text-dark">{{ stats.total }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card bg-white shadow-sm h-100 d-flex align-items-center border-start border-4 border-success">
+                <div class="stat-icon bg-success bg-opacity-10 text-success me-3"><i class="bi bi-check-circle-fill"></i></div>
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Sẵn sàng</div>
+                    <h3 class="fw-bold mb-0 text-success">{{ stats.ready }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card bg-white shadow-sm h-100 d-flex align-items-center border-start border-4 border-warning">
+                <div class="stat-icon bg-warning bg-opacity-10 text-warning me-3"><i class="bi bi-arrow-left-right"></i></div>
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Đang mượn</div>
+                    <h3 class="fw-bold mb-0 text-warning">{{ stats.borrowed }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3 col-6">
+            <div class="stat-card bg-white shadow-sm h-100 d-flex align-items-center border-start border-4 border-danger">
+                <div class="stat-icon bg-danger bg-opacity-10 text-danger me-3"><i class="bi bi-exclamation-triangle-fill"></i></div>
+                <div>
+                    <div class="text-muted small fw-bold text-uppercase">Bảo trì / Hỏng</div>
+                    <h3 class="fw-bold mb-0 text-danger">{{ stats.maintenance|add:stats.lost }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bg-white p-3 rounded-4 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <form method="GET" action="{% url 'facility_device_management' %}" class="d-flex gap-2 w-100" id="filterForm">
+            <div class="position-relative flex-grow-1" style="max-width: 400px;">
+                <i class="bi bi-search position-absolute text-muted" style="left: 15px; top: 10px;"></i>
+                <input type="text" name="search" class="form-control rounded-pill bg-light border-0" placeholder="Tìm theo Mã hoặc Tên thiết bị..." value="{{ search_query }}" style="padding-left: 45px;">
+            </div>
+            
+            <select name="status" class="form-select bg-light border-0 fw-bold shadow-none rounded-pill w-auto" onchange="document.getElementById('filterForm').submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>-- Tất cả trạng thái --</option>
+                <option value="ready" {% if status_filter == 'ready' %}selected{% endif %}>Sẵn sàng</option>
+                <option value="borrowed" {% if status_filter == 'borrowed' %}selected{% endif %}>Đang mượn</option>
+                <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Đang bảo trì</option>
+                <option value="lost" {% if status_filter == 'lost' %}selected{% endif %}>Hỏng / Thất lạc</option>
+            </select>
+            
+            <a href="{% url 'facility_device_management' %}" class="btn btn-light rounded-pill px-3 shadow-sm text-muted"><i class="bi bi-arrow-clockwise"></i> Reset</a>
+        </form>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Mã QR</th>
+                        <th>Mã TB</th>
+                        <th>Tên Thiết bị</th>
+                        <th>Trạng thái</th>
+                        <th>Ngày Nhập</th>
+                        <th class="text-end pe-4">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">
+                    {% for device in devices %}
+                    <tr>
+                        <td class="ps-4">
+                            <img src="https://api.qrserver.com/v1/create-qr-code/?size=60x60&data={{ device.device_code }}" 
+                                 class="qr-thumb" 
+                                 onclick="showQRModal('https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={{ device.device_code }}', '{{ device.device_code }}')" 
+                                 title="Bấm để in mã">
+                        </td>
+                        <td class="fw-bold text-primary">{{ device.device_code }}</td>
+                        <td class="fw-bold text-dark">{{ device.name }}</td>
+                        <td>
+                            {% if device.status == 'ready' %}
+                                <span class="badge bg-success bg-opacity-10 text-success border border-success status-badge"><i class="bi bi-check-circle me-1"></i> Sẵn sàng</span>
+                            {% elif device.status == 'borrowed' %}
+                                <span class="badge bg-warning bg-opacity-10 text-warning border border-warning status-badge"><i class="bi bi-arrow-left-right me-1"></i> Đang mượn</span>
+                            {% elif device.status == 'maintenance' %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary status-badge"><i class="bi bi-tools me-1"></i> Bảo trì</span>
+                            {% else %}
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger status-badge"><i class="bi bi-x-circle me-1"></i> Hỏng/Mất</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">{{ device.purchase_date|date:"d/m/Y"|default:"-" }}</td>
+                        <td class="text-end pe-4">
+                            {% if device.status != 'borrowed' %}
+                            <button class="btn btn-sm btn-outline-secondary rounded-pill fw-bold ms-1" onclick="openUpdateStatusModal({{ device.id }}, '{{ device.device_code }}', '{{ device.status }}')">
+                                <i class="bi bi-pencil-square"></i> Sửa
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-light rounded-pill fw-bold ms-1 text-muted" disabled title="Thiết bị đang mượn, không thể đổi trạng thái"><i class="bi bi-lock-fill"></i> Đang giao</button>
+                            {% endif %}
+
+                            <button class="btn btn-sm btn-outline-info rounded-pill fw-bold" onclick="viewHistory({{ device.id }}, '{{ device.device_code }}')"><i class="bi bi-clock-history"></i> Lịch sử</button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5 text-muted">
+                            <i class="bi bi-box-seam fs-1 opacity-50 d-block mb-3"></i>
+                            Không tìm thấy thiết bị nào trong kho.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="updateStatusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-secondary bg-opacity-10 border-bottom-0 pb-0">
+                <h6 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square me-2"></i>Cập nhật: <span id="updateDeviceCode" class="text-primary"></span></h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pt-3">
+                <input type="hidden" id="update_device_id">
+                <label class="form-label fw-bold small text-dark">Trạng thái mới</label>
+                <select id="update_device_status" class="form-select bg-light border-0 fw-bold">
+                    <option value="ready">Sẵn sàng</option>
+                    <option value="maintenance">Đang bảo trì</option>
+                    <option value="lost">Hỏng / Thất lạc</option>
+                </select>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-3 justify-content-center">
+                <button type="button" class="btn btn-secondary rounded-pill px-4 py-2 fw-bold shadow-sm w-100" onclick="submitUpdateStatus()">Lưu Thay Đổi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addDeviceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-primary bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-plus-circle-fill me-2"></i>Nhập Kho Thiết bị Mới</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Tên thiết bị <span class="text-danger">*</span></label>
+                    <input type="text" id="new_device_name" class="form-control bg-light border-0 fw-bold" placeholder="VD: Laptop Dell Inspiron, Kit Wedo 2.0...">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Số lượng nhập kho <span class="text-danger">*</span></label>
+                    <div class="input-group">
+                        <input type="number" id="new_device_quantity" class="form-control bg-light border-0 fw-bold text-primary" value="1" min="1" max="50">
+                        <span class="input-group-text bg-light border-0">chiếc</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm" onclick="submitAddDevice()">Nhập Kho Ngay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="qrModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4 text-center p-4">
+            <h5 class="fw-bold text-primary mb-3" id="qrModalTitle">MÃ THIẾT BỊ</h5>
+            <div class="bg-light p-3 rounded-3 d-inline-block mx-auto mb-3 border border-dashed border-2 border-secondary">
+                <img id="qrModalImg" src="" style="width: 200px; height: 200px;">
+            </div>
+            <p class="text-muted small mb-3">Dùng máy in mã vạch để in tem dán lên thiết bị.</p>
+            <button class="btn btn-dark rounded-pill fw-bold" onclick="window.print()"><i class="bi bi-printer me-2"></i>In Mã QR</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="historyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-info bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-info"><i class="bi bi-clock-history me-2"></i>Lịch sử Sử dụng: <span id="historyDeviceCode" class="text-dark"></span></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="table-responsive">
+                    <table class="table table-sm table-striped align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th>Người mượn</th>
+                                <th>Lớp học</th>
+                                <th>Giờ mượn</th>
+                                <th>Giờ trả</th>
+                                <th>Trạng thái</th>
+                            </tr>
+                        </thead>
+                        <tbody id="historyBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function showQRModal(url, code) {
+        document.getElementById('qrModalImg').src = url;
+        document.getElementById('qrModalTitle').innerText = 'MÃ: ' + code;
+        new bootstrap.Modal(document.getElementById('qrModal')).show();
+    }
+
+    function submitAddDevice() {
+        const name = document.getElementById('new_device_name').value;
+        const qty = document.getElementById('new_device_quantity').value;
+        if(!name) { alert("Vui lòng nhập tên thiết bị!"); return; }
+        
+        let fd = new FormData(); fd.append('name', name); fd.append('quantity', qty);
+        fetch("{% url 'api_add_device' %}", { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{csrf_token}}'}})
+        .then(r => r.json()).then(d => { alert(d.message); if(d.status === 'success') window.location.reload(); });
+    }
+
+    // ĐÃ SỬA: Hàm mở Modal cập nhật trạng thái
+    function openUpdateStatusModal(id, code, currentStatus) {
+        document.getElementById('update_device_id').value = id;
+        document.getElementById('updateDeviceCode').innerText = code;
+        document.getElementById('update_device_status').value = currentStatus;
+        new bootstrap.Modal(document.getElementById('updateStatusModal')).show();
+    }
+
+    function submitUpdateStatus() {
+        let fd = new FormData();
+        fd.append('device_id', document.getElementById('update_device_id').value);
+        fd.append('status', document.getElementById('update_device_status').value);
+        
+        fetch("{% url 'api_update_device_status' %}", { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{csrf_token}}'}})
+        .then(r => r.json())
+        .then(d => { alert(d.message); if(d.status === 'success') window.location.reload(); });
+    }
+
+    function viewHistory(deviceId, deviceCode) {
+        document.getElementById('historyDeviceCode').innerText = deviceCode;
+        document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" class="text-center"><div class="spinner-border spinner-border-sm text-info"></div> Đang tải...</td></tr>';
+        new bootstrap.Modal(document.getElementById('historyModal')).show();
+        
+        fetch(`/facility/api/device-history/${deviceId}/`)
+        .then(r => r.json())
+        .then(d => {
+            if(d.status === 'success') {
+                if(d.data.length === 0) {
+                    document.getElementById('historyBody').innerHTML = '<tr><td colspan="5" class="text-center text-muted fst-italic">Chưa có lịch sử mượn trả nào.</td></tr>';
+                    return;
+                }
+                let html = '';
+                d.data.forEach(log => {
+                    let badge = log.status === 'Đã trả' ? '<span class="badge bg-success">Đã trả</span>' : '<span class="badge bg-warning text-dark">Đang mượn</span>';
+                    html += `<tr><td class="fw-bold">${log.borrower}</td><td><span class="badge bg-light text-dark border">${log.class_code}</span></td><td class="text-muted small">${log.borrow_time}</td><td class="text-muted small">${log.return_time}</td><td>${badge}</td></tr>`;
+                });
+                document.getElementById('historyBody').innerHTML = html;
+            }
+        });
+    }
+</script>
+{% endblock %}

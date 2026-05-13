@@ -1,0 +1,402 @@
+<div class="modal fade" id="leadDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg rounded-4 bg-white">
+            
+            <div class="modal-header bg-white border-bottom-0 pb-2 pt-4 px-4 d-flex justify-content-between align-items-center">
+                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-headset text-primary me-2"></i>Chi tiết Chăm sóc</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            
+            <div class="px-4 pb-3 bg-white d-flex gap-2 flex-wrap">
+                <button type="button" class="btn btn-sm btn-outline-primary rounded-pill fw-bold shadow-sm" onclick="openDuplicateLeadModal()">
+                    <i class="bi bi-person-plus-fill me-1"></i> Thêm bé / Khóa
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-info rounded-pill fw-bold shadow-sm" onclick="openUpdateModal()">
+                    <i class="bi bi-pencil-square me-1"></i> Cập nhật
+                </button>
+                <button type="button" class="btn btn-sm btn-success rounded-pill fw-bold shadow-sm" onclick="triggerWonFromDetail()">
+                    <i class="bi bi-check-circle-fill me-1"></i> Chốt Deal
+                </button>
+                {% if request.user.role == 'admin' or request.user.is_superuser %}
+                    <button type="button" class="btn btn-sm btn-warning text-dark rounded-pill fw-bold shadow-sm" onclick="openAssignModal()">
+                        <i class="bi bi-send-fill me-1"></i> Giao thẻ
+                    </button>
+                {% else %}
+                    <form method="POST" action="" id="assignForm" class="m-0 d-none d-inline-block">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="assign_lead">
+                        <input type="hidden" name="lead_id" id="assignLeadId" value="">
+                        <button type="submit" class="btn btn-sm btn-warning text-dark rounded-pill fw-bold shadow-sm">
+                            <i class="bi bi-person-check-fill me-1"></i> Nhận thẻ
+                        </button>
+                    </form>
+                {% endif %}
+            </div>
+            
+            <div class="modal-body p-4 pt-2 pb-0 bg-white">
+                <input type="hidden" id="detail_hidden_id">
+                <input type="hidden" id="detail_hidden_parent">
+                <input type="hidden" id="detail_hidden_phone">
+                <input type="hidden" id="detail_hidden_student">
+                <input type="hidden" id="detail_hidden_age">
+                <input type="hidden" id="detail_hidden_course">
+                <input type="hidden" id="detail_hidden_schedule">
+                <input type="hidden" id="detail_hidden_source">
+
+                <div class="border border-2 border-light rounded-4 p-3 mb-3 bg-light shadow-sm">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-1" id="detailParentName">Tên Phụ huynh</h5>
+                            <div class="text-muted small fw-bold mb-1"><i class="bi bi-telephone-fill me-1 text-secondary"></i> <span id="detailPhone"></span></div>
+                            <div class="text-primary small fw-bold mb-1"><i class="bi bi-funnel-fill me-1"></i> Nguồn: <span id="detailSource"></span></div>
+                            <div class="text-secondary small fw-bold"><i class="bi bi-person-badge me-1"></i> Phụ trách: <span id="detailAssignee" class="text-dark"></span></div>
+                        </div>
+                        <div class="text-end">
+                            <div class="badge bg-white text-info border shadow-sm mb-1 px-3 py-2"><i class="bi bi-person-fill me-1"></i> Bé: <span id="detailStudent"></span> (<span id="detailAge"></span> tuổi)</div><br>
+                            <div class="badge bg-white text-warning border shadow-sm px-3 py-2 mb-1"><i class="bi bi-book me-1"></i> Khóa: <span id="detailCourse" class="text-dark"></span></div><br>
+                            <div class="badge bg-white text-primary border shadow-sm px-3 py-2"><i class="bi bi-calendar2-check me-1"></i> Lịch rảnh: <span id="detailSchedule" class="text-dark"></span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border border-2 border-light rounded-4 p-3 mb-3 bg-light shadow-sm">
+                    <label class="fw-bold text-dark small mb-2"><i class="bi bi-clock-history text-secondary me-1"></i> Lịch sử làm việc:</label>
+                    <div class="notes-history bg-white rounded-3 border p-3" id="detailNotesHistory" style="white-space: pre-wrap; font-size: 0.9rem; line-height: 1.5; height: 160px; overflow-y: auto;"></div>
+                </div>
+            </div>
+
+            <div class="p-4 pt-0 bg-white border-top">
+                <form method="POST" action="" class="m-0 pt-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="add_note">
+                    <input type="hidden" name="lead_id" id="detailLeadId" value="">
+                    
+                    <div class="border border-2 border-light rounded-4 p-3 bg-light shadow-sm">
+                        <label class="fw-bold text-dark small mb-2"><i class="bi bi-pencil-square text-primary me-1"></i> Cập nhật tình trạng & Đặt lịch hẹn:</label>
+                        <textarea name="new_note" class="form-control bg-white border-light shadow-sm rounded-3 mb-3" rows="1" placeholder="VD: Khách báo học phí hơi cao, hẹn gọi lại trao đổi ưu đãi..." required></textarea>
+                        
+                        <div class="row align-items-center">
+                            <div class="col-12 col-md-7 mb-2 mb-md-0">
+                                <div class="input-group shadow-sm">
+                                    <span class="input-group-text bg-white border-light text-danger fw-bold"><i class="bi bi-alarm me-2"></i>Hẹn gọi lại:</span>
+                                    <input type="date" name="follow_up_date" class="form-control bg-white border-light text-dark fw-bold">
+                                </div>
+                            </div>
+                            <div class="col-12 col-md-5 text-end">
+                                <button type="submit" class="btn btn-primary w-100 rounded-pill py-2 fw-bold shadow-sm">Lưu Nhật Ký</button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="wonLeadModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-success border-0 rounded-top-4">
+                <h5 class="modal-title fw-bold text-white"><i class="bi bi-trophy-fill text-warning me-2"></i>Lập hồ sơ nhập học</h5>
+                <button type="button" class="btn-close btn-close-white" onclick="returnToDetailModalSafe('wonLeadModal')"></button>
+            </div>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="convert_lead">
+                <input type="hidden" name="lead_id" id="wonLeadId" value="">
+                
+                <input type="hidden" id="hidden_sessions_per_module" value="12">
+                <input type="hidden" id="hidden_price_per_module" value="5000000">
+                
+                <div class="modal-body p-4 pb-2">
+                    
+                    <div class="info-box border-success border-opacity-25 bg-success bg-opacity-10 mb-3 p-3 rounded-3">
+                        <p class="mb-1 small"><strong><i class="bi bi-person me-1"></i>Phụ huynh:</strong> <span id="won_parent" class="text-dark fw-bold"></span> - <strong>SĐT:</strong> <span id="won_phone" class="text-dark fw-bold"></span></p>
+                        <p class="mb-1 small"><strong><i class="bi bi-mortarboard me-1"></i>Học viên:</strong> <span id="won_student" class="text-primary fw-bold"></span> (<span id="won_age"></span> tuổi)</p>
+                        <p class="mb-1 small"><strong><i class="bi bi-book me-1"></i>Môn chốt:</strong> <span id="won_course" class="text-danger fw-bold"></span></p>
+                        <p class="mb-0 small"><strong><i class="bi bi-calendar2-check me-1"></i>Lịch học:</strong> <span id="won_schedule_display" class="text-info fw-bold"></span></p>
+                        <input type="hidden" name="preferred_schedule" id="won_schedule_hidden">
+                    </div>
+                    
+                    <div id="won_missing_info_warning" class="alert alert-danger small d-none mb-3 border-0 rounded-3 shadow-sm" style="background-color: #f8d7da; color: #842029;">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i> <strong>Chưa đủ thông tin!</strong> Vui lòng bấm <b>"Cập nhật"</b> bên dưới để bổ sung Tên, Tuổi, Khóa và Lịch học cho bé.
+                    </div>
+                    
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">Số Học phần mua</label>
+                            <input type="number" name="modules_bought" id="won_modules" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-dark" value="1" min="1" required oninput="calculateTuition()">
+                            <div class="form-text text-primary fw-bold mt-1" style="font-size: 0.75rem;"><i class="bi bi-info-circle me-1"></i>Quy đổi: <span id="won_sessions_display">...</span> buổi</div>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label fw-bold small text-secondary">Học phần bắt đầu</label>
+                            <input type="number" name="starting_module" id="won_starting_module" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-primary" value="1" min="1" required>
+                            <div class="form-text text-muted mt-1" style="font-size: 0.75rem;">VD: Học từ HP 2</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold small text-secondary">Học phí thực thu (VNĐ)</label>
+                            <input type="text" name="tuition_fee" id="won_tuition_fee" class="form-control form-control-lg bg-light border-0 rounded-3 shadow-none fw-bold text-success" required value="0">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold small text-secondary">Khuyến mãi (%)</label>
+                            <input type="number" name="discount_percent" id="won_discount" class="form-control form-control-lg bg-light border-0 rounded-3 shadow-none fw-bold text-danger" value="0" min="0" max="100" oninput="calculateTuition()">
+                        </div>
+                    </div>
+
+                </div>
+                
+                <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                    <button type="button" class="btn btn-light rounded-pill px-3 py-2 fw-bold me-2" onclick="returnToDetailModalSafe('wonLeadModal')">Hủy</button>
+                    <button type="button" class="btn btn-info text-white rounded-pill px-3 py-2 fw-bold me-2 shadow-sm" onclick="openUpdateModalFromWon()"><i class="bi bi-pencil-square me-1"></i>Cập nhật</button>
+                    <button type="submit" id="btn_submit_won" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm">Xác nhận Chốt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="addLeadModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-white border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-person-plus-fill text-primary me-2"></i>Tiếp nhận khách mới</h5>
+                <button type="button" class="btn-close" onclick="returnToDetailModalSafe('addLeadModal')"></button>
+            </div>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="add_lead">
+                <div class="modal-body p-4 pt-0 pb-2">
+                    <div class="row mb-3 g-3">
+                        <div class="col-7">
+                            <label class="form-label fw-bold small text-secondary">Phụ huynh <span class="text-danger">*</span></label>
+                            <input type="text" name="parent_name" id="add_parent_name" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-dark" required>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label fw-bold small text-secondary">SĐT <span class="text-danger">*</span></label>
+                            <input type="text" name="phone" id="add_phone" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-dark" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Nguồn khách hàng <span class="text-danger">*</span></label>
+                        <select name="lead_source" class="form-select bg-light border-0 rounded-3 shadow-none fw-bold text-primary">
+                            <option value="facebook">Facebook Ads</option>
+                            <option value="zalo">Zalo / Hotline</option>
+                            <option value="referral">Người quen giới thiệu</option>
+                            <option value="website">Website Teky</option>
+                            <option value="event">Sự kiện / School Tour</option>
+                            <option value="other">Nguồn khác</option>
+                        </select>
+                    </div>
+                    
+                    <hr class="text-muted opacity-25 my-4">
+                    <p class="fw-bold text-secondary small mb-2"><i class="bi bi-info-circle me-1"></i>Thông tin bổ sung (Có thể cập nhật sau)</p>
+                    
+                    <div class="row mb-3 g-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold small text-secondary">Tên Học sinh</label>
+                            <input type="text" name="student_name" id="add_student_name" class="form-control border-0 bg-light shadow-none fw-bold text-info">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold small text-secondary">Tuổi bé</label>
+                            <select name="student_age" id="add_age" class="form-select border-0 bg-light shadow-none fw-bold text-dark" onchange="updateDynamicFields('add')">
+                                <option value="">- Chọn -</option>
+                                <option value="3">3 tuổi</option><option value="4">4 tuổi</option>
+                                <option value="5">5 tuổi</option><option value="6">6 tuổi</option>
+                                <option value="7">7 tuổi</option><option value="8">8 tuổi</option>
+                                <option value="9">9 tuổi</option><option value="10">10 tuổi</option>
+                                <option value="11">11 tuổi</option><option value="12">12 tuổi</option>
+                                <option value="13">13 tuổi</option><option value="14">14 tuổi</option>
+                                <option value="15">15 tuổi</option><option value="16">16 tuổi</option>
+                                <option value="17">17 tuổi</option><option value="18">18 tuổi</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Khóa học quan tâm</label>
+                        <select name="interested_course" id="add_course" class="form-select border-0 bg-light shadow-none fw-bold text-dark">
+                            <option value="">-- Vui lòng chọn Tuổi bé trước --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Lịch học mong muốn</label>
+                        <input type="hidden" name="preferred_schedule" id="add_pref_schedule">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select id="add_day" class="form-select border-0 bg-light shadow-none fw-bold text-primary" onchange="combineSchedule('add')">
+                                    <option value="">-- Chọn Thứ --</option>
+                                    <option value="Thứ 2">Thứ 2</option><option value="Thứ 3">Thứ 3</option>
+                                    <option value="Thứ 4">Thứ 4</option><option value="Thứ 5">Thứ 5</option>
+                                    <option value="Thứ 6">Thứ 6</option><option value="Thứ 7">Thứ 7</option>
+                                    <option value="Chủ Nhật">Chủ Nhật</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select id="add_time" class="form-select border-0 bg-light shadow-none fw-bold text-primary" onchange="combineSchedule('add')">
+                                    <option value="">-- Chọn Giờ --</option>
+                                    <option value="09h00 - 10h30" class="time-day">09h00 - 10h30</option>
+                                    <option value="10h30 - 12h00" class="time-day">10h30 - 12h00</option>
+                                    <option value="14h00 - 15h30" class="time-day">14h00 - 15h30</option>
+                                    <option value="15h30 - 17h00" class="time-day">15h30 - 17h00</option>
+                                    <option value="18h00 - 19h30" class="time-night">18h00 - 19h30</option>
+                                    <option value="19h30 - 21h00" class="time-night">19h30 - 21h00</option>
+                                </select>
+                            </div>
+                        </div>
+                        <small id="add_night_warning" class="text-danger d-none mt-2 fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Mầm non không học tối. T2-T6 không học ngày. Vui lòng chọn Thứ 7/CN!</small>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 pt-0 pb-4 justify-content-center gap-2">
+                    <button type="submit" name="save_action" value="save" class="btn btn-light border fw-bold shadow-sm px-4">Lưu đóng</button>
+                    <button type="submit" name="save_action" value="continue" class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm">Lưu & Tiếp tục <i class="bi bi-arrow-right ms-1"></i></button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="importLeadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-success bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-success"><i class="bi bi-file-earmark-excel me-2"></i>Import Khách hàng</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form method="POST" action="" enctype="multipart/form-data">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="import_leads">
+                <div class="modal-body p-4 pb-2">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Chọn File Excel/CSV <span class="text-danger">*</span></label>
+                        <input type="file" name="import_file" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-dark" accept=".csv, .xlsx, .xls" required>
+                    </div>
+                    <div class="alert alert-warning small mb-0 border-0 rounded-3">
+                        <i class="bi bi-info-circle-fill me-1"></i> <strong>Lưu ý cấu trúc file:</strong><br>
+                        Hệ thống sẽ đọc lần lượt các cột: <br>
+                        <strong>Cột 1:</strong> Tên Phụ huynh | <strong>Cột 2:</strong> SĐT | <strong>Cột 3:</strong> Nguồn (facebook/zalo...)
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                    <button type="submit" class="btn btn-success rounded-pill px-5 py-2 fw-bold shadow-sm">Tải lên & Tự động chia data</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="updateLeadModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-info bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-info"><i class="bi bi-pencil-square me-2"></i>Bổ sung thông tin</h5>
+                <button type="button" class="btn-close" onclick="returnToDetailModalSafe('updateLeadModal')"></button>
+            </div>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_lead">
+                <input type="hidden" name="lead_id" id="update_lead_id" value="">
+                
+                <div class="modal-body p-4 pb-2">
+                    <div class="row mb-3 g-3">
+                        <div class="col-8">
+                            <label class="form-label fw-bold small text-secondary">Tên Học sinh</label>
+                            <input type="text" name="student_name" id="update_student_name" class="form-control bg-light border-0 rounded-3 shadow-none fw-bold text-dark">
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label fw-bold small text-secondary">Tuổi bé</label>
+                            <select name="student_age" id="update_age" class="form-select border-0 bg-light shadow-none fw-bold text-dark" onchange="updateDynamicFields('update')">
+                                <option value="">- Chọn -</option>
+                                <option value="3">3</option><option value="4">4</option>
+                                <option value="5">5</option><option value="6">6</option>
+                                <option value="7">7</option><option value="8">8</option>
+                                <option value="9">9</option><option value="10">10</option>
+                                <option value="11">11</option><option value="12">12</option>
+                                <option value="13">13</option><option value="14">14</option>
+                                <option value="15">15</option><option value="16">16</option>
+                                <option value="17">17</option><option value="18">18</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-secondary">Khóa học quan tâm</label>
+                        <select name="interested_course" id="update_course" class="form-select bg-light border-0 rounded-3 shadow-none fw-bold text-dark">
+                            <option value="">-- Vui lòng chọn Tuổi bé trước --</option>
+                        </select>
+                    </div>
+                    <div class="mb-3 text-start">
+                        <label class="form-label fw-bold small text-secondary">Lịch học mong muốn</label>
+                        <input type="hidden" name="preferred_schedule" id="update_pref_schedule">
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <select id="update_day" class="form-select border-0 bg-light shadow-none fw-bold text-primary" onchange="combineSchedule('update')">
+                                    <option value="">-- Chọn Thứ --</option>
+                                    <option value="Thứ 2">Thứ 2</option><option value="Thứ 3">Thứ 3</option>
+                                    <option value="Thứ 4">Thứ 4</option><option value="Thứ 5">Thứ 5</option>
+                                    <option value="Thứ 6">Thứ 6</option><option value="Thứ 7">Thứ 7</option>
+                                    <option value="Chủ Nhật">Chủ Nhật</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <select id="update_time" class="form-select border-0 bg-light shadow-none fw-bold text-primary" onchange="combineSchedule('update')">
+                                    <option value="">-- Chọn Giờ --</option>
+                                    <option value="09h00 - 10h30" class="time-day">09h00 - 10h30</option>
+                                    <option value="10h30 - 12h00" class="time-day">10h30 - 12h00</option>
+                                    <option value="14h00 - 15h30" class="time-day">14h00 - 15h30</option>
+                                    <option value="15h30 - 17h00" class="time-day">15h30 - 17h00</option>
+                                    <option value="18h00 - 19h30" class="time-night">18h00 - 19h30</option>
+                                    <option value="19h30 - 21h00" class="time-night">19h30 - 21h00</option>
+                                </select>
+                            </div>
+                        </div>
+                        <small id="update_night_warning" class="text-danger d-none mt-2 fw-bold"><i class="bi bi-exclamation-triangle-fill"></i> Trẻ Mầm non không học tối.</small>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                    <button type="button" class="btn btn-light rounded-pill px-4 py-2 fw-bold me-2" onclick="returnToDetailModalSafe('updateLeadModal')">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-info text-white rounded-pill px-5 py-2 fw-bold shadow-sm">Lưu lại</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="assignLeadModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-warning bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-send-fill text-warning me-2"></i>Giao thẻ chăm sóc</h5>
+                <button type="button" class="btn-close" onclick="returnToDetailModalSafe('assignLeadModal')"></button>
+            </div>
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="assign_lead">
+                <input type="hidden" name="lead_id" id="modalAssignLeadId" value="">
+                
+                <div class="modal-body p-4 pb-2">
+                    <p class="small text-muted mb-2">Đang thao tác thẻ khách hàng:<br><strong id="assignModalParentName" class="text-dark fs-5"></strong></p>
+                    
+                    <div class="p-3 bg-light border border-warning border-opacity-50 rounded-3 mb-3">
+                        <div class="small fw-bold text-secondary mb-1">Người đang phụ trách:</div>
+                        <div class="fw-bold text-dark mb-3"><i class="bi bi-person-fill me-1"></i> <span id="currentAssigneeName"></span></div>
+                        
+                        <div class="small fw-bold text-primary mb-1">Chuyển thẻ sang cho:</div>
+                        <select name="assigned_user_id" class="form-select border-warning shadow-none fw-bold text-dark" required>
+                            <option value="">-- Chọn nhân sự mới --</option>
+                            {% for u in sales_team %}
+                                <option value="{{ u.id }}">{{ u.first_name|default:u.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                    <button type="button" class="btn btn-light rounded-pill px-4 py-2 fw-bold" onclick="returnToDetailModalSafe('assignLeadModal')">Hủy</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 py-2 fw-bold shadow-sm text-dark">Chuyển thẻ</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,394 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý Mở Lớp - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    .table-hover tbody tr:hover { background-color: #f8f9fa; transition: background-color 0.2s ease; }
+    .table-custom th { font-weight: 700; color: #6c757d; border-bottom: 2px solid #f1f3f5; border-top: none; letter-spacing: 0.5px; }
+    .table-custom td { vertical-align: middle; border-bottom: 1px solid #f8f9fa; padding: 1.2rem 0.5rem; }
+    @keyframes pulse-border {
+        0% { border-color: rgba(220, 53, 69, 0.4); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.4); }
+        70% { border-color: rgba(220, 53, 69, 0); box-shadow: 0 0 0 6px rgba(220, 53, 69, 0); }
+        100% { border-color: rgba(220, 53, 69, 0); box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+    }
+    .pulse-danger { animation: pulse-border 2s infinite; }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-danger d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Quản lý Xếp Lớp & Mở Lớp</h4>
+            <p class="text-muted mb-0 small">Gom học viên, tạo lớp mới hoặc xếp học viên vào các lớp đang hoạt động.</p>
+        </div>
+    </div>
+
+    <div class="bg-white p-3 rounded-4 shadow-sm mb-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div class="btn-group shadow-sm" role="group">
+            <input type="radio" class="btn-check" name="viewToggle" id="btnPerfect" autocomplete="off" checked onchange="toggleView('perfect')">
+            <label class="btn btn-outline-success fw-bold px-3 py-2" for="btnPerfect"><i class="bi bi-check-all me-1"></i> Có thể xếp ngay (<span id="badgePerfect">0</span>)</label>
+
+            <input type="radio" class="btn-check" name="viewToggle" id="btnWaiting" autocomplete="off" onchange="toggleView('waiting')">
+            <label class="btn btn-outline-secondary fw-bold px-3 py-2" for="btnWaiting"><i class="bi bi-hourglass-split me-1"></i> Chờ gom lớp (<span id="badgeWaiting">0</span>)</label>
+        </div>
+        
+        <div class="d-flex gap-2 flex-wrap align-items-center">
+            <select id="gradeFilter" class="form-select form-select-sm bg-light border-0 fw-bold shadow-none rounded-pill w-auto" onchange="handleFilterChange()">
+                <option value="all">-- 1. Chọn Khối --</option>
+                <option value="mam_non">Mầm non (Dưới 6T)</option>
+                <option value="1-3">Khối 1-3 (6-8T)</option>
+                <option value="4-6">Khối 4-6 (9-11T)</option>
+                <option value="7-9">Khối 7-9 (12-14T)</option>
+                <option value="10-12">Khối 10-12 (15-18T)</option>
+            </select>
+
+            <select id="dayFilter" class="form-select form-select-sm bg-light border-0 fw-bold shadow-none rounded-pill w-auto" onchange="handleFilterChange()">
+                <option value="all">-- 2. Chọn Thứ --</option>
+                <option value="Thứ 2">Thứ 2</option><option value="Thứ 3">Thứ 3</option><option value="Thứ 4">Thứ 4</option>
+                <option value="Thứ 5">Thứ 5</option><option value="Thứ 6">Thứ 6</option><option value="Thứ 7">Thứ 7</option>
+                <option value="Chủ Nhật">Chủ Nhật</option>
+            </select>
+
+            <select id="timeFilter" class="form-select form-select-sm bg-light border-0 fw-bold shadow-none rounded-pill w-auto" onchange="handleFilterChange()">
+                <option value="all">-- 3. Chọn Giờ --</option>
+                <option value="09h00" class="time-day">09h00 - 10h30</option>
+                <option value="10h30" class="time-day">10h30 - 12h00</option>
+                <option value="14h00" class="time-day">14h00 - 15h30</option>
+                <option value="15h30" class="time-day">15h30 - 17h00</option>
+                <option value="18h00" class="time-night">18h00 - 19h30</option>
+                <option value="19h30" class="time-night">19h30 - 21h00</option>
+            </select>
+
+            <select id="courseFilter" class="form-select form-select-sm bg-light border-0 fw-bold shadow-none rounded-pill w-auto" onchange="handleFilterChange()" style="max-width: 200px;">
+                <option value="all">-- 4. Chọn Môn --</option>
+                {% for c in courses %}
+                    <option value="{{ c.name }}" data-grade="{{ c.grade_group }}">{{ c.name }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="button" id="btnGomLop" class="btn btn-primary btn-sm rounded-pill fw-bold shadow-sm px-4 ms-2" onclick="openCreateClassModal()" style="display: none;">
+                <i class="bi bi-magic me-1"></i> Gom mở lớp mới
+            </button>   
+        </div>
+    </div>
+
+    <div id="perfectMatchSection" class="mb-4">
+        <div class="card border-success border-2 shadow-sm rounded-4 overflow-hidden bg-success bg-opacity-10">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-success">
+                        <tr>
+                            <th class="ps-4">Mã HV</th>
+                            <th>Học viên</th>
+                            <th>Phụ huynh</th>
+                            <th class="text-primary">Khóa & Lịch</th>
+                            <th style="width: 320px;">Chọn lớp đang mở</th>
+                            <th class="text-end pe-4" style="width: 140px;">Thao tác</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        {% for reg in perfect_match_regs %}
+                        <tr class="perfect-row-item student-row" data-grade="{{ reg.computed_grade_group }}" data-course="{{ reg.course.name }}" data-schedule="{{ reg.pref_sched }}">
+                            <td class="fw-bold text-primary ps-4">{{ reg.student.student_code }}</td>
+                            <td><div class="fw-bold text-dark">{{ reg.student.full_name }}</div><small class="text-muted">Khối: {{ reg.computed_grade_group }}</small></td>
+                            <td><div class="small fw-bold text-dark">{{ reg.student.get_parent_name }}</div><div class="small text-muted">{{ reg.student.get_phone }}</div></td>
+                            <td>
+                                <span class="badge bg-warning text-dark px-2 mb-1">{{ reg.course.name }}</span><br>
+                                <span class="text-success fw-bold small">{{ reg.pref_sched|default:"Chưa xác định" }}</span>
+                            </td>
+                            <td>
+                                <div class="mb-2">
+                                    <span class="badge bg-danger bg-opacity-10 text-danger border border-danger pulse-danger px-2 py-1 shadow-sm" style="font-size: 0.75rem;">
+                                        <i class="bi bi-arrow-right-circle-fill me-1"></i> Bé cần học từ: Học phần {{ reg.starting_module|default:1 }}
+                                    </span>
+                                </div>
+                                <select class="form-select form-select-sm border-success shadow-none fw-bold text-success" id="class-select-{{ reg.id }}">
+                                    <option value="">-- Chọn lớp khớp --</option>
+                                    {% for c in reg.matching_classes %}
+                                        <option value="{{ c.id }}">{{ c.class_code }} (Đang dạy HP {{ c.current_module }})</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="text-end pe-4 align-middle">
+                                <button class="btn btn-success btn-sm fw-bold rounded-pill shadow-sm px-4" onclick="assignClass({{ reg.id }})">Xếp lớp</button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <tr id="empty-perfect-message" style="display: none;">
+                            <td colspan="6" class="text-center text-muted py-5"><i class="bi bi-check-circle fs-1 d-block opacity-50 mb-2"></i>Không có phiếu đăng ký nào khớp bộ lọc.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="waitingListSection" style="display: none;">
+        <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 40px;" class="text-center"><input class="form-check-input border-secondary shadow-sm" type="checkbox" onchange="toggleAllCheckboxes(this)"></th>
+                            <th>Mã HV</th>
+                            <th>Học viên</th>
+                            <th>Phụ huynh</th>
+                            <th class="text-primary">Khóa & Lịch</th>
+                            <th class="text-end pe-4" style="width: 150px;">Ghi chú</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white" id="waitingStudentsBody">
+                        
+                        {% for reg in waiting_regs %}
+                        <tr class="waiting-row-item student-row" data-grade="{{ reg.computed_grade_group }}" data-course="{{ reg.course.name }}" data-schedule="{{ reg.pref_sched }}">
+                            <td class="text-center"><input class="form-check-input border-secondary shadow-sm student-checkbox" type="checkbox" value="{{ reg.id }}"></td>
+                            <td class="fw-bold text-primary">{{ reg.student.student_code }}</td>
+                            <td><div class="fw-bold text-dark">{{ reg.student.full_name }}</div><small class="text-muted">Khối: {{ reg.computed_grade_group }}</small></td>
+                            <td><div class="small fw-bold text-dark">{{ reg.student.get_parent_name }}</div><div class="small text-muted">{{ reg.student.get_phone }}</div></td>
+                            <td>
+                                <span class="badge bg-warning text-dark px-2 mb-1">{{ reg.course.name }}</span><br>
+                                <span class="text-danger fw-bold small">{{ reg.pref_sched|default:"Chưa xác định" }}</span>
+                            </td>
+                            <td class="text-end pe-4 align-middle">
+                                <div class="small text-muted fst-italic mb-2 text-end w-100">Cần gom lớp</div>
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger pulse-danger px-2 py-1 shadow-sm text-center" style="font-size: 0.75rem;"><i class="bi bi-arrow-right-circle-fill me-1"></i> Bắt đầu: HP {{ reg.starting_module|default:1 }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        {% for reg in perfect_match_regs %}
+                        <tr class="waiting-row-item student-row" data-grade="{{ reg.computed_grade_group }}" data-course="{{ reg.course.name }}" data-schedule="{{ reg.pref_sched }}">
+                            <td class="text-center"><input class="form-check-input border-secondary shadow-sm student-checkbox" type="checkbox" value="{{ reg.id }}"></td>
+                            <td class="fw-bold text-primary">{{ reg.student.student_code }}</td>
+                            <td><div class="fw-bold text-dark">{{ reg.student.full_name }}</div><small class="text-muted">Khối: {{ reg.computed_grade_group }}</small></td>
+                            <td><div class="small fw-bold text-dark">{{ reg.student.get_parent_name }}</div><div class="small text-muted">{{ reg.student.get_phone }}</div></td>
+                            <td>
+                                <span class="badge bg-warning text-dark px-2 mb-1">{{ reg.course.name }}</span><br>
+                                <span class="text-success fw-bold small">{{ reg.pref_sched|default:"Chưa xác định" }}</span>
+                            </td>
+                            <td class="text-end pe-4 align-middle">
+                                <div class="small text-success fw-bold mb-2 text-end w-100">Có thể xếp ngay</div>
+                                <span class="badge bg-danger bg-opacity-10 text-danger border border-danger pulse-danger px-2 py-1 shadow-sm text-center" style="font-size: 0.75rem;"><i class="bi bi-arrow-right-circle-fill me-1"></i> Bắt đầu: HP {{ reg.starting_module|default:1 }}</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        
+                        <tr id="empty-waiting-message" style="display: none;">
+                            <td colspan="6" class="text-center text-muted py-5"><i class="bi bi-hourglass-split fs-1 d-block opacity-50 mb-2"></i>Không có học viên chờ.</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="createClassModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-primary bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-magic me-2"></i>Mở lớp & Gán nhanh</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pb-2">
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Gán vào Môn học <span class="text-danger">*</span></label>
+                    <select id="new_class_course" class="form-select border-primary shadow-none fw-bold" onchange="updateNewClassSummary()">
+                        <option value="">-- Chọn Khóa Học --</option>
+                        {% for c in courses %}
+                            <option value="{{ c.id }}">{{ c.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-3 mb-3">
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-dark">Thứ</label>
+                        <select id="new_class_day" class="form-select bg-light border-0 fw-bold" onchange="updateNewClassSummary()">
+                            <option value="T2">Thứ 2</option><option value="T3">Thứ 3</option><option value="T4">Thứ 4</option>
+                            <option value="T5">Thứ 5</option><option value="T6">Thứ 6</option><option value="T7" selected>Thứ 7</option>
+                            <option value="CN">Chủ nhật</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-dark">Ca học</label>
+                        <select id="new_class_time" class="form-select bg-light border-0 fw-bold" onchange="updateNewClassSummary()">
+                            <option value="09h00-10h30">09h00 - 10h30</option>
+                            <option value="10h30-12h00">10h30 - 12h00</option>
+                            <option value="14h00-15h30">14h00 - 15h30</option>
+                            <option value="15h30-17h00">15h30 - 17h00</option>
+                            <option value="18h00-19h30">18h00 - 19h30</option>
+                            <option value="19h30-21h00">19h30 - 21h00</option>
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label fw-bold small text-dark">Học phần bắt đầu (Dự kiến)</label>
+                        <input type="number" id="new_class_starting_module" class="form-control bg-light border-0 fw-bold text-danger" value="1" min="1" oninput="updateNewClassSummary()">
+                    </div>
+                </div>
+                
+                <div class="p-3 bg-primary bg-opacity-10 rounded-3 border border-primary mt-4">
+                    <h6 class="fw-bold text-primary mb-2 border-bottom border-primary pb-2"><i class="bi bi-info-square-fill me-2"></i>Thông tin lớp sắp mở:</h6>
+                    <div class="small fw-bold text-dark mb-1">Môn học: <span id="summary_course" class="text-primary">Chưa chọn</span></div>
+                    <div class="small fw-bold text-dark mb-1">Lịch học: <span id="summary_schedule" class="text-primary">Thứ 7 (09h00-10h30)</span></div>
+                    <div class="small fw-bold text-dark mb-1">Bắt đầu từ: <span id="summary_module" class="text-danger">Học phần 1</span></div>
+                    <div class="small fw-bold text-dark mt-2 pt-2 border-top">Sĩ số khởi tạo: <span id="count_students_to_add" class="badge bg-danger fs-6 ms-1">0</span> phiếu đăng ký</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-primary rounded-pill px-5 py-2 fw-bold shadow-sm" onclick="submitCreateNewClass()">Xác nhận Mở lớp</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentView = 'perfect';
+
+    function toggleView(view) {
+        currentView = view;
+        if(view === 'perfect') {
+            document.getElementById('perfectMatchSection').style.display = 'block'; 
+            document.getElementById('waitingListSection').style.display = 'none'; 
+            document.getElementById('btnGomLop').style.display = 'none'; 
+        } else {
+            document.getElementById('perfectMatchSection').style.display = 'none'; 
+            document.getElementById('waitingListSection').style.display = 'block'; 
+            document.getElementById('btnGomLop').style.display = 'block'; 
+        }
+    }
+
+    function handleFilterChange() {
+        const gVal = document.getElementById('gradeFilter').value; 
+        const dVal = document.getElementById('dayFilter').value; 
+        const tVal = document.getElementById('timeFilter').value; 
+        const cVal = document.getElementById('courseFilter').value;
+
+        const isWeekday = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6'].includes(dVal);
+        const timeOpts = document.getElementById('timeFilter').options;
+        
+        for (let i = 1; i < timeOpts.length; i++) {
+            const isNight = timeOpts[i].classList.contains('time-night');
+            const isDay = timeOpts[i].classList.contains('time-day');
+            let disable = false;
+            if (gVal === 'mam_non' && isNight) disable = true;
+            if (isWeekday && isDay) disable = true;
+
+            timeOpts[i].disabled = disable;
+            timeOpts[i].hidden = disable;
+            if (disable && timeOpts[i].value === tVal) document.getElementById('timeFilter').value = 'all';
+        }
+
+        const cOpts = document.getElementById('courseFilter').options;
+        for (let i = 1; i < cOpts.length; i++) {
+            let cGrade = cOpts[i].getAttribute('data-grade');
+            if (gVal !== 'all' && cGrade !== 'all' && cGrade !== gVal) {
+                cOpts[i].hidden = true; 
+                if (cVal === cOpts[i].value) document.getElementById('courseFilter').value = 'all';
+            } else { 
+                cOpts[i].hidden = false; 
+            }
+        }
+
+        let pCount = 0; let wCount = 0;
+        document.querySelectorAll('.student-row').forEach(row => {
+            const rGrade = row.getAttribute('data-grade') || '';
+            const rCourse = row.getAttribute('data-course') || '';
+            const rSched = row.getAttribute('data-schedule') || '';
+
+            const mG = (gVal === 'all' || rGrade === gVal);
+            const mC = (cVal === 'all' || rCourse.includes(cVal));
+            const mD = (dVal === 'all' || rSched.includes(dVal));
+            const mT = (tVal === 'all' || rSched.replace(/\s+/g, '').includes(tVal.replace(/\s+/g, '')));
+
+            if (mG && mC && mD && mT) {
+                row.style.display = '';
+                if (row.classList.contains('perfect-row-item')) pCount++;
+                if (row.classList.contains('waiting-row-item')) wCount++;
+            } else {
+                row.style.display = 'none';
+                let cb = row.querySelector('.student-checkbox'); if(cb) cb.checked = false;
+            }
+        });
+
+        const emptyPerfect = document.getElementById('empty-perfect-message');
+        if (emptyPerfect) emptyPerfect.style.display = (pCount === 0) ? '' : 'none';
+        
+        const emptyWaiting = document.getElementById('empty-waiting-message');
+        if (emptyWaiting) emptyWaiting.style.display = (wCount === 0) ? '' : 'none';
+        
+        document.getElementById('badgePerfect').innerText = pCount; 
+        document.getElementById('badgeWaiting').innerText = wCount;
+    }
+
+    function toggleAllCheckboxes(source) {
+        document.querySelectorAll('.waiting-row-item .student-checkbox').forEach(cb => { 
+            if(cb.closest('tr').style.display !== 'none') cb.checked = source.checked; 
+        });
+    }
+
+    // ĐÃ SỬA: Biến param thành regId để gọi API chuẩn xác
+    function assignClass(regId) {
+        const cid = document.querySelector(`#class-select-${regId}`).value; 
+        if(!cid) return alert("Vui lòng chọn lớp trong danh sách xổ xuống!");
+        let fd = new FormData(); 
+        fd.append('student_id', regId); // Mặc dù tên biến backend là student_id nhưng giá trị truyền là ID của phiếu đăng ký
+        fd.append('class_id', cid);
+        fetch('/api/assign_student/', { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{csrf_token}}'}})
+            .then(r => r.json())
+            .then(d => { if(d.status === 'success') window.location.reload(); else alert(d.message); });
+    }
+
+    function updateNewClassSummary() {
+        const courseSelect = document.getElementById('new_class_course');
+        const day = document.getElementById('new_class_day').value;
+        const time = document.getElementById('new_class_time').value;
+        const startMod = document.getElementById('new_class_starting_module').value;
+        
+        document.getElementById('summary_course').innerText = courseSelect.options[courseSelect.selectedIndex].text || 'Chưa chọn';
+        document.getElementById('summary_schedule').innerText = `${day} (${time})`;
+        document.getElementById('summary_module').innerText = `Học phần ${startMod}`;
+    }
+
+    function openCreateClassModal() {
+        let ids = [];
+        document.querySelectorAll('.student-checkbox:checked').forEach(cb => { 
+            if(cb.closest('tr').style.display !== 'none') ids.push(cb.value); 
+        });
+        if(ids.length === 0) return alert("Vui lòng tích chọn phiếu đăng ký ở bảng chờ trước khi tạo lớp!");
+        
+        document.getElementById('count_students_to_add').innerText = ids.length;
+        let currentFilterCourse = document.getElementById('courseFilter').value; 
+        let courseSelect = document.getElementById('new_class_course');
+        
+        if (currentFilterCourse && currentFilterCourse !== 'all') { 
+            for (let i = 0; i < courseSelect.options.length; i++) { 
+                if (courseSelect.options[i].text.includes(currentFilterCourse)) { 
+                    courseSelect.selectedIndex = i; break; 
+                } 
+            } 
+        }
+        
+        updateNewClassSummary();
+        new bootstrap.Modal(document.getElementById('createClassModal')).show();
+    }
+
+    function submitCreateNewClass() {
+        let ids = []; 
+        document.querySelectorAll('.student-checkbox:checked').forEach(cb => ids.push(cb.value));
+        
+        let fd = new FormData();
+        fd.append('course_id', document.getElementById('new_class_course').value); 
+        fd.append('day_of_week', document.getElementById('new_class_day').value);
+        fd.append('time_slot', document.getElementById('new_class_time').value); 
+        fd.append('starting_module', document.getElementById('new_class_starting_module').value);
+        fd.append('student_ids', ids.join(',')); // Gửi ID của phiếu đăng ký
+        
+        fetch('/api/create_class/', { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{csrf_token}}'}})
+            .then(r => r.json())
+            .then(d => { alert(d.message); window.location.reload(); });
+    }
+
+    document.addEventListener("DOMContentLoaded", handleFilterChange);
+</script>
+{% endblock %}

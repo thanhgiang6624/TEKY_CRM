@@ -1,0 +1,293 @@
+{% extends 'base.html' %}
+{% block title %}Quản lý Danh sách Lớp - TEKY CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0 pb-5">
+    
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-danger d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Quản lý Danh sách Lớp học</h4>
+            <p class="text-muted mb-0 small">Theo dõi trạng thái, tiến độ giảng dạy và gán giáo viên.</p>
+        </div>
+    </div>
+
+    <div class="bg-white p-3 rounded-4 shadow-sm mb-4">
+        <form method="GET" action="" class="row g-2 align-items-center">
+            <div class="col-12 col-md-5">
+                <div class="input-group bg-light rounded-pill px-3 py-1 border">
+                    <span class="input-group-text bg-transparent border-0 p-0 pe-2"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="search" class="form-control border-0 shadow-none bg-transparent fw-bold" placeholder="Tìm theo Mã lớp, Tên môn..." value="{{ search_query }}">
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <select name="status" class="form-select bg-light border fw-bold shadow-none rounded-pill py-2" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' %}selected{% endif %}>Tất cả trạng thái</option>
+                    <option value="pending" {% if status_filter == 'pending' %}selected{% endif %}>⏳ Chờ khai giảng</option>
+                    <option value="active" {% if status_filter == 'active' %}selected{% endif %}>🚀 Đang học</option>
+                    <option value="completed" {% if status_filter == 'completed' %}selected{% endif %}>✅ Đã kết thúc</option>
+                </select>
+            </div>
+            <div class="col-6 col-md-2 d-none d-md-block">
+                <button type="submit" class="btn btn-dark rounded-pill fw-bold w-100">Lọc dữ liệu</button>
+            </div>
+        </form>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Mã Lớp</th>
+                        <th>Tiến độ</th>
+                        <th>Khóa & Lịch</th>
+                        <th>Trạng thái</th>
+                        <th>Giáo viên & Sĩ số</th>
+                        <th class="text-end pe-4">Thao tác</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">
+                    {% for c in classes %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">{{ c.class_code }}</td>
+                        <td>
+                            <div class="d-flex flex-column gap-1 mb-1">
+                                <div><span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary shadow-sm" style="min-width: 100px;">Bắt đầu: HP {{ c.starting_module }}</span></div>
+                                <div><span class="badge bg-danger bg-opacity-10 text-danger border border-danger shadow-sm" style="min-width: 100px;">Đang dạy: HP {{ c.current_module }}</span></div>
+                            </div>
+                            <!-- <span class="text-muted fw-bold small">Tổng: {{ c.course.total_sessions }} buổi</span> -->
+                        </td>
+
+                        <td>
+                            <span class="badge bg-warning text-dark px-2 mb-1">{{ c.course.name }}</span><br>
+                            <span class="text-secondary fw-bold small">{{ c.get_day_of_week_display }} ({{ c.get_time_slot_display }})</span>
+                        </td>
+                        <td>
+
+                            {% if c.status == 'pending' %}
+                                <span class="badge bg-warning text-dark rounded-pill px-3 py-2 shadow-sm"><i class="bi bi-hourglass-split me-1"></i> Chờ khai giảng</span>
+                            {% elif c.status == 'active' %}
+                                <span class="badge bg-success rounded-pill px-3 py-2 shadow-sm"><i class="bi bi-rocket-takeoff-fill me-1"></i> Đang học</span>
+                            {% else %}
+                                <span class="badge bg-secondary rounded-pill px-3 py-2 shadow-sm"><i class="bi bi-check-circle-fill me-1"></i> Đã kết thúc</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="mb-1">
+                                {% if c.teacher %}
+                                    <span class="fw-bold text-dark"><i class="bi bi-person-badge text-success me-1"></i> {{ c.teacher.first_name|default:c.teacher.username }}</span>
+                                {% else %}
+                                    <span class="text-danger fst-italic small"><i class="bi bi-exclamation-circle text-danger me-1"></i> Chưa có GV</span>
+                                {% endif %}
+                            </div>
+                            <div class="small fw-bold text-info"><i class="bi bi-people-fill me-1"></i> Sĩ số: {{ c.students.count }} học viên</div>
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-warning text-dark fw-bold rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Cập nhật Lớp"
+                                        onclick="openUpdateClassModal({{ c.id }}, '{{ c.class_code }}', '{{ c.teacher.id|default:"" }}', '{{ c.day_of_week }}', '{{ c.time_slot }}', '{{ c.status }}', {{ c.starting_module }}, {{ c.current_module }})">
+                                    <i class="bi bi-pencil-square"></i>
+                                </button>
+                                
+                                {% if c.status == 'pending' %}
+                                    <button class="btn btn-success fw-bold rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Khai giảng Lớp học" onclick="openActivateModal({{ c.id }}, '{{ c.class_code }}')">
+                                        <i class="bi bi-play-fill fs-5"></i>
+                                    </button>
+                                {% else %}
+                                    <a href="/class/{{ c.id }}/info/" class="btn btn-primary text-white fw-bold rounded-circle shadow-sm d-flex align-items-center justify-content-center" style="width: 35px; height: 35px;" title="Xem chi tiết (Điểm danh)">
+                                        <i class="bi bi-eye-fill"></i>
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted py-5">Không có lớp học nào.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="activateClassModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-success bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-success"><i class="bi bi-rocket-takeoff-fill me-2"></i>Khai giảng Lớp học</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pb-2">
+                <p class="small text-muted mb-3">Thiết lập thông tin để chính thức đưa lớp <strong id="actClassCode" class="text-dark"></strong> vào vận hành.</p>
+                <input type="hidden" id="activateClassId" value="">
+                
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Chỉ định Giáo viên <span class="text-danger">*</span></label>
+                    <select id="actTeacher" class="form-select border-success shadow-none fw-bold" required>
+                        <option value="">-- Chọn Giáo viên --</option>
+                        {% for t in teachers %}
+                            <option value="{{ t.id }}">{{ t.first_name|default:t.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-dark">Ngày học buổi đầu <span class="text-danger">*</span></label>
+                    <input type="date" id="actStartDate" class="form-control border-success shadow-none fw-bold text-dark" required>
+                </div>
+                
+                <div class="mb-3 p-3 bg-light rounded-3 border">
+                    <label class="form-label fw-bold small text-primary">Học phần bắt đầu (Tua nhanh) <span class="text-danger">*</span></label>
+                    <input type="number" id="actStartModule" class="form-control shadow-none fw-bold text-primary border-primary" value="1" min="1" max="20" required>
+                    <small class="text-muted fst-italic mt-1 d-block" style="font-size: 11px;">Mặc định là 1. Nếu bạn gõ 5, hệ thống sẽ tự động tua qua 4 học phần trước đó.</small>
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-success rounded-pill px-5 py-2 fw-bold shadow-sm" onclick="submitActivateClass()">🚀 Khai giảng ngay</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="updateClassModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-warning bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-dark"><i class="bi bi-pencil-square text-warning me-2"></i>Sửa thông tin Lớp học</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pb-2">
+                <p class="small text-muted mb-3">Đang cập nhật thông tin cho Lớp: <strong id="updClassCode" class="text-primary fs-6"></strong></p>
+                <input type="hidden" id="updateClassId" value="">
+                
+                <div class="row g-3 mb-3">
+                    <div class="col-12">
+                        <label class="form-label fw-bold small text-dark">Giáo viên phụ trách</label>
+                        <select id="updTeacher" class="form-select bg-light border-0 shadow-none fw-bold text-dark">
+                            <option value="">-- Trống (Chưa có GV) --</option>
+                            {% for t in teachers %}
+                                <option value="{{ t.id }}">{{ t.first_name|default:t.username }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-dark">Thứ học</label>
+                        <select id="updDayOfWeek" class="form-select bg-light border-0 shadow-none fw-bold text-primary">
+                            <option value="T2">Thứ 2</option>
+                            <option value="T3">Thứ 3</option>
+                            <option value="T4">Thứ 4</option>
+                            <option value="T5">Thứ 5</option>
+                            <option value="T6">Thứ 6</option>
+                            <option value="T7">Thứ 7</option>
+                            <option value="CN">Chủ nhật</option>
+                        </select>
+                    </div>
+
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-dark">Ca học</label>
+                        <select id="updTimeSlot" class="form-select bg-light border-0 shadow-none fw-bold text-primary">
+                            <option value="09h00-10h30">09h00 - 10h30</option>
+                            <option value="10h30-12h00">10h30 - 12h00</option>
+                            <option value="14h00-15h30">14h00 - 15h30</option>
+                            <option value="15h30-17h00">15h30 - 17h00</option>
+                            <option value="18h00-19h30">18h00 - 19h30</option>
+                            <option value="19h30-21h00">19h30 - 21h00</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-secondary">Bắt đầu Học phần</label>
+                        <input type="number" id="updStartingModule" class="form-control bg-light border-0 shadow-none fw-bold text-secondary" min="1">
+                    </div>
+
+                    <div class="col-6">
+                        <label class="form-label fw-bold small text-danger">Đang dạy Học phần</label>
+                        <input type="number" id="updCurrentModule" class="form-control bg-light border-0 shadow-none fw-bold text-danger" min="1">
+                    </div>
+
+                    <div class="col-12">
+                        <div class="form-text text-muted mb-2" style="font-size: 0.75rem;"><i class="bi bi-info-circle me-1"></i>Thay đổi số "Đang dạy HP" sẽ tự động tua nhanh tiến độ thực tế (số buổi) của Lớp.</div>
+                        <label class="form-label fw-bold small text-dark">Trạng thái lớp</label>
+                        <select id="updStatus" class="form-select bg-light border-0 shadow-none fw-bold text-dark">
+                            <option value="pending">Chờ khai giảng</option>
+                            <option value="active">Đang học</option>
+                            <option value="completed">Đã kết thúc</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-warning text-dark rounded-pill px-5 py-2 fw-bold shadow-sm" onclick="submitUpdateClass()">Lưu thay đổi</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function openActivateModal(classId, classCode) {
+        document.getElementById('activateClassId').value = classId;
+        document.getElementById('actClassCode').innerText = classCode;
+        let today = new Date().toISOString().split('T')[0];
+        document.getElementById('actStartDate').value = today;
+        document.getElementById('actTeacher').value = '';
+        document.getElementById('actStartModule').value = 1;
+        new bootstrap.Modal(document.getElementById('activateClassModal')).show();
+    }
+
+    function submitActivateClass() {
+        let classId = document.getElementById('activateClassId').value;
+        let startDate = document.getElementById('actStartDate').value;
+        let teacherId = document.getElementById('actTeacher').value;
+        let startModule = document.getElementById('actStartModule').value;
+        
+        if(!startDate || !teacherId || !startModule) return alert("Vui lòng điền đầy đủ thông tin khai giảng!");
+
+        let formData = new FormData();
+        formData.append('class_id', classId);
+        formData.append('start_date', startDate);
+        formData.append('teacher_id', teacherId);
+        formData.append('start_module', startModule); 
+
+        fetch('/api/activate_class/', { method: 'POST', body: formData, headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+        .then(res => res.json()).then(data => {
+            if (data.status === 'success') { alert(data.message); window.location.reload(); } 
+            else { alert('Lỗi: ' + data.message); }
+        });
+    }
+
+    // ĐÃ SỬA: Hàm cập nhật thêm Starting Module
+    function openUpdateClassModal(id, code, teacherId, day, time, status, startingModule, currentModule) {
+        document.getElementById('updateClassId').value = id;
+        document.getElementById('updClassCode').innerText = code;
+        document.getElementById('updTeacher').value = teacherId;
+        document.getElementById('updDayOfWeek').value = day;
+        document.getElementById('updTimeSlot').value = time;
+        document.getElementById('updStatus').value = status;
+        document.getElementById('updStartingModule').value = startingModule; // Nạp Học phần bắt đầu
+        document.getElementById('updCurrentModule').value = currentModule; // Nạp Học phần hiện tại
+        
+        new bootstrap.Modal(document.getElementById('updateClassModal')).show();
+    }
+
+    function submitUpdateClass() {
+        let formData = new FormData();
+        formData.append('class_id', document.getElementById('updateClassId').value);
+        formData.append('teacher_id', document.getElementById('updTeacher').value);
+        formData.append('day_of_week', document.getElementById('updDayOfWeek').value);
+        formData.append('time_slot', document.getElementById('updTimeSlot').value);
+        formData.append('status', document.getElementById('updStatus').value);
+        formData.append('starting_module', document.getElementById('updStartingModule').value); // Gửi Học phần bắt đầu
+        formData.append('current_module', document.getElementById('updCurrentModule').value); // Gửi Học phần hiện tại
+
+        fetch('/api/update_class_info/', { method: 'POST', body: formData, headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
+        .then(res => res.json()).then(data => {
+            if (data.status === 'success') window.location.reload(); 
+            else alert('Lỗi: ' + data.message);
+        });
+    }
+</script>
+{% endblock %}

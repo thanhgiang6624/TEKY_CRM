@@ -1,0 +1,682 @@
+{% extends 'base.html' %}
+{% block title %}Bảng quản lý Sales - TEKY CRM{% endblock %}
+
+{% block content %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+<style>
+    .kanban-list::-webkit-scrollbar { width: 4px; }
+    .kanban-list::-webkit-scrollbar-track { background: transparent; }
+    .kanban-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+    .kanban-list::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    .kanban-board-area { gap: 10px; overflow-x: hidden; padding-bottom: 5px; height: calc(100vh - 250px); }
+    .kanban-column { flex: 1 1 0; min-width: 0; border-radius: 12px; padding: 10px; }
+    .kanban-card { transition: transform 0.2s ease, box-shadow 0.2s ease; border-radius: 10px; }
+    .kanban-card:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.1) !important; }
+    .text-truncate-custom { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .dropdown-item-custom { transition: background-color 0.2s ease; cursor: pointer; }
+    .dropdown-item-custom:hover { background-color: #e9ecef; }
+</style>
+
+<div id="kanban-main-wrapper" class="container-fluid p-0 pb-4">
+    <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 10000; width: 100%; max-width: 500px; margin-top: 10px;">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="toast align-items-center text-white {% if message.tags == 'success' %}bg-success{% else %}bg-danger{% endif %} border-0 mb-2 w-100 shadow-lg rounded-pill" role="alert">
+                <div class="d-flex p-2 px-3">
+                    <div class="toast-body fw-bold fs-6 p-0 d-flex align-items-center"><i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %} me-2 fs-5"></i>{{ message }}</div>
+                    <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-primary d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Tuyển sinh (Sales)</h4>
+            <p class="text-muted mb-0 small">Kéo thả thẻ khách hàng để cập nhật tiến trình tư vấn.</p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if request.user.role == 'admin' or request.user.is_superuser %}
+            <button type="button" class="btn btn-success rounded-pill fw-bold shadow-sm px-3" data-bs-toggle="modal" data-bs-target="#importLeadModal"><i class="bi bi-file-earmark-excel me-1"></i> Import Khách</button>
+            {% endif %}
+            <button type="button" class="btn btn-primary rounded-pill fw-bold shadow-sm px-3" onclick="openAddModalNew()"><i class="bi bi-plus-lg me-1"></i> Khách mới</button>
+        </div>
+    </div>
+
+    <div class="mb-4 bg-white p-2 rounded-4 shadow-sm d-flex flex-column flex-xl-row align-items-xl-center gap-3">
+        <ul class="nav nav-pills bg-light p-1 rounded-pill shadow-inner flex-shrink-0" id="viewTabs" role="tablist" style="width: max-content;">
+            <li class="nav-item" role="presentation"><button class="nav-link active rounded-pill fw-bold px-4 py-2" data-bs-toggle="pill" data-bs-target="#kanban-view" type="button"><i class="bi bi-kanban me-2"></i></button></li>
+            <li class="nav-item" role="presentation"><button class="nav-link rounded-pill fw-bold px-4 py-2 text-secondary" data-bs-toggle="pill" data-bs-target="#list-view" type="button"><i class="bi bi-list-task me-2"></i></button></li>
+        </ul>
+
+        <form method="GET" action="" class="m-0 flex-grow-1">
+            <div class="row g-2 align-items-center justify-content-xl-end">
+                <div class="col-12 col-md-5 col-xl-5">
+                    <div class="input-group bg-light rounded-pill px-3 py-1">
+                        <span class="input-group-text bg-transparent border-0 p-0 pe-2"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" name="search" class="form-control border-0 shadow-none text-dark bg-transparent fw-bold p-0" placeholder="Tìm kiếm Phụ huynh, SĐT..." value="{{ search_query }}">
+                    </div>
+                </div>
+                <div class="col-6 col-md-4 col-xl-3">
+                    <select name="assignee" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-pill fw-bold py-2" onchange="this.form.submit()">
+                        <option value="my_leads" {% if assignee_filter == 'my_leads' %}selected{% endif %}>👤 Khách của Tôi</option>
+                        <option value="all" {% if assignee_filter == 'all' %}selected{% endif %}>🌍 Tất cả Khách</option>
+                    </select>
+                </div>
+                <div class="col-6 col-md-3 col-xl-3">
+                    <select name="month" class="form-select border-0 text-center text-dark shadow-none bg-light rounded-pill fw-bold py-2" onchange="this.form.submit()">
+                        <option value="all" {% if filter_month == 'all' %}selected{% endif %}>📅 Tất cả thời gian</option>
+                        {% for m in month_choices %}
+                            <option value="{{ m.value }}" {% if filter_month == m.value %}selected{% endif %}>📅 {{ m.label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="submit" class="d-none"></button>
+            </div>
+        </form>
+    </div>
+
+    <div class="tab-content" id="viewTabsContent">
+        <div class="tab-pane fade show active" id="kanban-view" role="tabpanel">
+            <div class="d-flex align-items-start w-100 kanban-board-area">
+                {% for col in kanban_columns %}
+                <div class="kanban-column d-flex flex-column shadow-sm h-100 bg-white" style="border-top: 4px solid {{ col.color }};">
+                    <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 0.9rem !important;">{{ col.title }}</h6>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="badge rounded-pill shadow-sm" style="background-color: {{ col.color }}; font-size: 0.75rem;">{{ col.leads.count }}</span>
+                            <div class="dropdown">
+                                <button class="btn btn-sm btn-light p-0 px-1 border-0 rounded" type="button" data-bs-toggle="dropdown">
+                                    <i id="filter-icon-{{ col.id }}" class="bi bi-funnel-fill text-secondary" style="font-size: 0.8rem;"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0 p-2" style="min-width: 230px;">
+                                    <li class="dropdown-header fw-bold text-dark px-2 py-1 border-bottom mb-1 d-flex justify-content-between align-items-center">
+                                        <span>Lọc Nguồn (Cột này)</span>
+                                        <span class="badge bg-primary" style="cursor:pointer;" onclick="filterColumnSource('{{ col.id }}', 'all')">Tất Cả</span>
+                                    </li>
+                                    {% for s in col.sources %}
+                                    <li class="d-flex justify-content-between align-items-center px-2 py-2 small dropdown-item-custom rounded" onclick="filterColumnSource('{{ col.id }}', '{{ s.name|escapejs }}')">
+                                        <span class="text-truncate fw-bold text-secondary" style="max-width: 140px;">
+                                            <i class="bi bi-circle-fill me-2" style="font-size: 0.4rem; color: {{ col.color }};"></i>{{ s.name }}
+                                        </span>
+                                        <span class="badge bg-secondary rounded-pill">{{ s.count }}</span>
+                                    </li>
+                                    {% empty %}
+                                    <li class="text-muted px-2 py-1 small text-center">Chưa có dữ liệu</li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="col-{{ col.id }}" class="kanban-list flex-grow-1" data-status="{{ col.id }}" style="overflow-y: auto; overflow-x: hidden; padding-right: 4px;">
+                        {% for lead in col.leads %}
+                        <div class="card border-0 shadow-sm mb-3 kanban-card" 
+                             data-modules="{{ lead.modules_bought|default:1 }}" 
+                             data-discount="{{ lead.discount_percent|default:0 }}"
+                             data-starting-module="{{ lead.starting_module|default:1 }}"
+                             data-id="{{ lead.id }}" data-parent="{{ lead.parent_name }}" data-phone="{{ lead.phone }}" 
+                             data-student="{{ lead.student_name|default:'' }}" data-age="{{ lead.student_age|default:'' }}" 
+                             data-course="{{ lead.interested_course }}" data-schedule="{{ lead.preferred_schedule|default:'' }}"
+                             data-schedule-display="{{ lead.get_preferred_schedule_display|default:'' }}" data-source="{{ lead.get_lead_source_display }}"
+                             data-assignee-name="{% if lead.assigned_to %}{{ lead.assigned_to.first_name|default:lead.assigned_to.username }}{% else %}Chưa phân bổ{% endif %}"
+                             style="cursor: grab; border-left: 4px solid {{ col.color }} !important; {% if col.id == 'lost' %}opacity:0.7;{% endif %}">
+                            <div class="card-body p-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="fw-bold {% if col.id == 'lost' %}text-secondary{% else %}text-dark{% endif %} mb-0 lh-base text-truncate-custom" title="{{ lead.parent_name }}">
+                                        {% if col.id == 'lost' %}<del>{{ lead.parent_name }}</del>{% else %}{{ lead.parent_name }}{% endif %}
+                                    </h6>
+                                    <button type="button" class="btn btn-sm text-secondary bg-light rounded-circle p-1 flex-shrink-0 ms-1" onclick="openLeadModal(this)"><i class="bi bi-arrows-angle-expand"></i></button>
+                                </div>
+                                <div id="notes-{{ lead.id }}" class="d-none">{{ lead.notes|default:"" }}</div>
+                                <div class="d-flex justify-content-between align-items-center small pt-1">
+                                    <span class="text-muted fw-bold text-truncate-custom" style="font-size: 0.8rem;">
+                                        <i class="bi bi-person-badge me-1 text-primary"></i> {% if lead.assigned_to %}{{ lead.assigned_to.first_name|default:lead.assigned_to.username }}{% else %}<span class="text-danger">Trống</span>{% endif %}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="list-view" role="tabpanel">
+            <div class="card border-0 shadow-sm rounded-4 overflow-hidden bg-white">
+                <div class="table-responsive px-2">
+                    <table class="table table-hover table-custom mb-0">
+                        <thead class="bg-white">
+                            <tr>
+                                <th class="ps-4 text-uppercase small">Phụ huynh</th>
+                                <th class="text-uppercase small">Học sinh quan tâm</th>
+                                <th class="text-uppercase small">Khóa & Lịch yêu cầu</th>
+                                <th class="text-uppercase small">Trạng thái & Phụ trách</th>
+                                <th class="pe-4 text-end text-uppercase small">Hành động</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white border-light">
+                            {% for lead in all_leads %}
+                            <tr>
+                                <td class="ps-4">
+                                    <div class="fw-bold text-dark mb-1">{{ lead.parent_name }}</div>
+                                    <small class="text-muted fw-bold"><i class="bi bi-telephone-fill text-secondary me-1"></i> {{ lead.phone }}</small>
+                                </td>
+                                <td>
+                                    <div class="fw-bold text-info mb-1"><i class="bi bi-person-fill me-1"></i> {% if lead.student_name %}{{ lead.student_name }}{% else %}<span class="text-muted fst-italic">Chưa có</span>{% endif %}</div>
+                                    {% if lead.student_age %}
+                                        <div class="small text-secondary fw-bold mb-1 ms-4 ps-1">{{ lead.student_age }} tuổi</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="mb-1">
+                                        <span class="badge bg-light text-dark border shadow-sm px-2">{{ lead.interested_course|default:"Chưa xác định" }}</span>
+                                    </div>
+                                    {% if lead.preferred_schedule %}
+                                        <span class="text-primary fw-bold small"><i class="bi bi-calendar2-check me-1"></i> {{ lead.preferred_schedule }}</span>
+                                    {% else %}
+                                        <span class="text-muted fst-italic small">Chưa chọn lịch</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="mb-2">
+                                        {% if lead.status == 'new' %}<span class="badge bg-info text-dark rounded-pill px-3 py-1 shadow-sm">Khách Mới</span>{% endif %}
+                                        {% if lead.status == 'consulting' %}<span class="badge bg-warning text-dark rounded-pill px-3 py-1 shadow-sm">Tư Vấn</span>{% endif %}
+                                        {% if lead.status == 'trial' %}<span class="badge bg-orange text-white rounded-pill px-3 py-1 shadow-sm" style="background:#fd7e14;">Học Thử</span>{% endif %}
+                                        {% if lead.status == 'won' %}<span class="badge bg-success rounded-pill px-3 py-1 shadow-sm">Đã Chốt</span>{% endif %}
+                                        {% if lead.status == 'lost' %}<span class="badge bg-secondary rounded-pill px-3 py-1 shadow-sm">Từ Chối</span>{% endif %}
+                                    </div>
+                                    <div class="fw-bold text-dark small">
+                                        <i class="bi bi-person-badge text-muted me-1"></i> 
+                                        {% if lead.assigned_to %}{{ lead.assigned_to.first_name|default:lead.assigned_to.username }}{% else %}<span class="text-danger fst-italic">Chưa phân bổ</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td class="pe-4 text-end align-middle">
+                                    <div class="d-none" id="list-data-{{ lead.id }}" data-id="{{ lead.id }}" data-parent="{{ lead.parent_name }}" data-phone="{{ lead.phone }}" data-student="{{ lead.student_name|default:'' }}" data-age="{{ lead.student_age|default:'' }}" data-course="{{ lead.interested_course }}" data-schedule="{{ lead.preferred_schedule|default:'' }}" data-source="{{ lead.get_lead_source_display }}" data-assignee-name="{% if lead.assigned_to %}{{ lead.assigned_to.first_name|default:lead.assigned_to.username }}{% else %}Chưa phân bổ{% endif %}" data-modules="{{ lead.modules_bought|default:1 }}" data-discount="{{ lead.discount_percent|default:0 }}" data-starting-module="{{ lead.starting_module|default:1 }}"></div>
+                                    <div id="notes-{{ lead.id }}" class="d-none">{{ lead.notes|default:"" }}</div>
+                                    <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-4 fw-bold shadow-sm" onclick="openLeadModal(document.getElementById('list-data-{{ lead.id }}'))">Chi tiết</button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center py-5 text-muted bg-white border-0">Không có dữ liệu.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'crm_modals.html' %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const pillsTab = document.querySelectorAll('#viewTabs .nav-link');
+    pillsTab.forEach(tab => {
+        tab.addEventListener('click', function() {
+            pillsTab.forEach(t => t.classList.add('text-secondary'));
+            this.classList.remove('text-secondary');
+        });
+    });
+
+    const coursesData = [
+        {% for c in courses %}
+        { name: "{{ c.name|escapejs }}", group: "{{ c.grade_group|escapejs }}" },
+        {% endfor %}
+    ];
+
+    function updateDynamicFields(prefix) {
+        const ageSelect = document.getElementById(prefix + '_age');
+        const courseSelect = document.getElementById(prefix + '_course');
+        const daySelect = document.getElementById(prefix + '_day');
+        const timeSelect = document.getElementById(prefix + '_time');
+        
+        const age = parseInt(ageSelect ? ageSelect.value : '');
+        const day = daySelect ? daySelect.value : '';
+
+        if (!isNaN(age) && courseSelect) {
+            const currentCourse = courseSelect.value;
+            let group = 'all';
+            if (age >= 3 && age <= 5) group = 'mam_non';
+            else if (age >= 6 && age <= 8) group = '1-3';
+            else if (age >= 9 && age <= 11) group = '4-6';
+            else if (age >= 12 && age <= 14) group = '7-9';
+            else if (age >= 15 && age <= 18) group = '10-12';
+
+            courseSelect.innerHTML = '<option value="">-- Chọn Khóa học --</option>';
+            coursesData.forEach(c => {
+                if (c.group === group || c.group === 'all') {
+                    courseSelect.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+                }
+            });
+            if (currentCourse && Array.from(courseSelect.options).some(opt => opt.value === currentCourse)) {
+                courseSelect.value = currentCourse;
+            }
+        } else if (courseSelect) {
+            courseSelect.innerHTML = '<option value="">-- Vui lòng chọn Tuổi bé trước --</option>';
+        }
+
+        if (timeSelect) {
+            const isWeekday = ['Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6'].includes(day);
+            const isPreschool = (!isNaN(age) && age >= 3 && age <= 5);
+            const dayOptions = timeSelect.querySelectorAll('.time-day'); 
+            const nightOptions = timeSelect.querySelectorAll('.time-night'); 
+            
+            dayOptions.forEach(opt => { opt.hidden = isWeekday; opt.disabled = isWeekday; });
+            nightOptions.forEach(opt => { opt.hidden = isPreschool; opt.disabled = isPreschool; });
+
+            const selectedOption = timeSelect.options[timeSelect.selectedIndex];
+            if (selectedOption && selectedOption.disabled) timeSelect.value = '';
+        }
+        combineSchedule(prefix);
+    }
+
+    function combineSchedule(prefix) {
+        const dayEl = document.getElementById(prefix + '_day');
+        const timeEl = document.getElementById(prefix + '_time');
+        const hiddenField = document.getElementById(prefix + '_pref_schedule');
+        if (dayEl && timeEl && hiddenField) {
+            hiddenField.value = (dayEl.value && timeEl.value) ? `${dayEl.value} (${timeEl.value})` : "";
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function(){
+        ['add', 'update'].forEach(prefix => {
+            const daySelect = document.getElementById(prefix + '_day');
+            if (daySelect) daySelect.onchange = function() { updateDynamicFields(prefix); };
+        });
+
+        const activeTabId = localStorage.getItem('activeKanbanTab');
+        if (activeTabId) {
+            const tabButton = document.querySelector(`[data-bs-target="${activeTabId}"]`);
+            if (tabButton) new bootstrap.Tab(tabButton).show();
+        }
+        pillsTab.forEach(tab => {
+            tab.addEventListener('shown.bs.tab', function(e) {
+                localStorage.setItem('activeKanbanTab', e.target.getAttribute('data-bs-target'));
+            });
+        });
+
+        var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+        toastElList.map(function (toastEl) { return new bootstrap.Toast(toastEl, { delay: 4000 }).show(); });
+
+        const reopenLeadId = "{{ reopen_lead_id|default:'' }}";
+        if (reopenLeadId && reopenLeadId.trim() !== "") {
+            let leadEl = document.querySelector(`.kanban-card[data-id="${reopenLeadId}"]`) || document.getElementById(`list-data-${reopenLeadId}`);
+            if (leadEl) setTimeout(() => { openLeadModal(leadEl); }, 100);
+        }
+    });
+
+    let isFromDetailModal = false;
+
+    function openAddModalNew() {
+        isFromDetailModal = false; 
+        document.getElementById('detail_hidden_id').value = ''; 
+        ['add_parent_name', 'add_phone', 'add_student_name', 'add_age', 'add_day', 'add_time'].forEach(id => {
+            document.getElementById(id).value = '';
+        });
+        updateDynamicFields('add');
+        new bootstrap.Modal(document.getElementById('addLeadModal')).show();
+    }
+
+    function returnToDetailModalSafe(currentModalId) {
+        var modalInstance = bootstrap.Modal.getInstance(document.getElementById(currentModalId));
+        if (modalInstance) modalInstance.hide();
+        
+        if (isFromDetailModal) {
+            let detailId = document.getElementById('detail_hidden_id').value;
+            if (detailId && detailId !== "") setTimeout(() => { new bootstrap.Modal(document.getElementById('leadDetailModal')).show(); }, 400);
+        }
+    }
+
+    /* ĐOẠN JS ĐÃ ĐƯỢC CHỈNH SỬA CHO PHÉP CONFIRM KHI VÀO/RA CỘT HỌC THỬ VÀ TỪ CHỐI */
+    let sortableInstances = [];
+    const columns = ['col-new', 'col-consulting', 'col-trial', 'col-won', 'col-lost'];
+    
+    columns.forEach(colId => {
+        const el = document.getElementById(colId);
+        if (!el) return;
+        
+        let sortable = new Sortable(el, {
+            group: 'shared', 
+            animation: 150, 
+            ghostClass: 'opacity-50',
+            onEnd: function (evt) {
+                const itemEl = evt.item;  
+                const leadId = itemEl.getAttribute('data-id');
+                const newStatus = evt.to.getAttribute('data-status');
+                const oldStatus = evt.from.getAttribute('data-status'); 
+
+                // Nếu thả vào lại đúng cột cũ thì không làm gì cả
+                if (newStatus === oldStatus) return;
+
+                // 1. Chặn kéo ngược từ các cột đã chốt
+                if (oldStatus === 'won') {
+                    alert("⚠️ Khách Hàng Đã Chốt không được phép kéo ngược lại.");
+                    window.location.reload(); return;
+                }
+
+                // 2. Logic kiểm tra CỘT HỌC THỬ và TỪ CHỐI
+                let confirmMessage = "";
+                let requiresConfirmation = false;
+
+                // Kéo VÀO cột Học Thử hoặc Từ Chối
+                if (newStatus === 'trial') {
+                    requiresConfirmation = true;
+                    confirmMessage = "Khách hàng này sẽ được chuyển sang trạng thái HỌC THỬ. Bạn đã xếp lịch cho khách chưa?";
+                } else if (newStatus === 'lost') {
+                    requiresConfirmation = true;
+                    confirmMessage = "Khách hàng này sẽ được chuyển sang trạng thái TỪ CHỐI. Bạn có chắc chắn muốn bỏ qua khách này?";
+                } 
+                // Kéo RA KHỎI cột Học Thử hoặc Từ Chối
+                else if (oldStatus === 'trial' && newStatus !== 'won') {
+                    requiresConfirmation = true;
+                    confirmMessage = "Khách hàng đang trong quá trình HỌC THỬ. Bạn có chắc muốn rút lại thẻ này?";
+                } else if (oldStatus === 'lost') {
+                    requiresConfirmation = true;
+                    confirmMessage = "Khách hàng này đã TỪ CHỐI trước đó. Bạn có chắc chắn muốn chăm sóc lại?";
+                }
+
+                // Nếu rơi vào trường hợp cần xác nhận
+                if (requiresConfirmation) {
+                    if (!confirm(confirmMessage)) {
+                        // Người dùng bấm Hủy -> Trả thẻ về vị trí cũ bằng cách chèn lại vào DOM
+                        evt.from.insertBefore(itemEl, evt.from.children[evt.oldIndex]);
+                        return; // Ngừng thực thi việc gọi API
+                    }
+                }
+
+                // 3. Xử lý riêng cho cột Đã Chốt (Bật Modal Nhập liệu)
+                if (newStatus === 'won') {
+                    evt.from.insertBefore(itemEl, evt.from.children[evt.oldIndex]);
+                    isFromDetailModal = false; 
+                    openWonModalFromData(itemEl);
+                    return; 
+                }
+
+                // 4. Nếu qua hết các ải kiểm duyệt -> Gọi API để lưu vào Database
+                fetch('/api/update_lead_status/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                    body: JSON.stringify({ 'lead_id': leadId, 'new_status': newStatus })
+                }).then(response => response.json()).then(data => {
+                    if(data.status === 'success') {
+                        // Đổi mờ nếu là cột Từ Chối
+                        if(newStatus === 'lost') itemEl.style.opacity = '0.7';
+                        else itemEl.style.opacity = '1';
+                        // Refresh để cập nhật số đếm badge
+                        window.location.reload(); 
+                    } else { 
+                        alert("Lỗi: " + data.message); 
+                        window.location.reload(); 
+                    }
+                });
+            },
+        });
+        sortableInstances.push(sortable);
+    });
+
+    function filterColumnSource(colId, sourceName) {
+        const cards = document.getElementById('col-' + colId).querySelectorAll('.kanban-card');
+        const iconBtn = document.getElementById('filter-icon-' + colId);
+        
+        cards.forEach(card => {
+            if (sourceName === 'all' || card.getAttribute('data-source') === sourceName) card.classList.remove('d-none');
+            else card.classList.add('d-none');
+        });
+        
+        iconBtn.classList.toggle('text-primary', sourceName !== 'all');
+        iconBtn.classList.toggle('text-secondary', sourceName === 'all');
+    }
+
+    function openLeadModal(element) {
+        let dataEl = element.hasAttribute('data-id') ? element : element.closest('.kanban-card');
+        if (!dataEl) return;
+
+        let id = dataEl.getAttribute('data-id');
+        let parent = dataEl.getAttribute('data-parent');
+        let phone = dataEl.getAttribute('data-phone');
+        let student = dataEl.getAttribute('data-student');
+        let age = dataEl.getAttribute('data-age');
+        let course = dataEl.getAttribute('data-course');
+        let schedule = dataEl.getAttribute('data-schedule');
+        let source = dataEl.getAttribute('data-source');
+        let assigneeName = dataEl.getAttribute('data-assignee-name') || 'Chưa phân bổ';
+        
+        document.getElementById('detail_hidden_id').value = id;
+        document.getElementById('detail_hidden_parent').value = parent;
+        document.getElementById('detail_hidden_phone').value = phone;
+        document.getElementById('detail_hidden_student').value = student;
+        document.getElementById('detail_hidden_age').value = age;
+        document.getElementById('detail_hidden_course').value = course;
+        document.getElementById('detail_hidden_schedule').value = schedule;
+        document.getElementById('detail_hidden_source').value = source;
+        
+        let modules = dataEl.getAttribute('data-modules') || 1;
+        let discount = dataEl.getAttribute('data-discount') || 0;
+        let starting_module = dataEl.getAttribute('data-starting-module') || 1;
+        
+        let hiddenModulesEl = document.getElementById('detail_hidden_modules') || Object.assign(document.createElement('input'), {type: 'hidden', id: 'detail_hidden_modules'});
+        document.body.appendChild(hiddenModulesEl); hiddenModulesEl.value = modules;
+
+        let hiddenDiscountEl = document.getElementById('detail_hidden_discount') || Object.assign(document.createElement('input'), {type: 'hidden', id: 'detail_hidden_discount'});
+        document.body.appendChild(hiddenDiscountEl); hiddenDiscountEl.value = discount;
+
+        let hiddenStartModEl = document.getElementById('detail_hidden_starting_module') || Object.assign(document.createElement('input'), {type: 'hidden', id: 'detail_hidden_starting_module'});
+        document.body.appendChild(hiddenStartModEl); hiddenStartModEl.value = starting_module;
+
+        document.getElementById('detailLeadId').value = id;
+        if(document.getElementById('assignLeadId')) document.getElementById('assignLeadId').value = id;
+        
+        document.getElementById('detailParentName').innerText = parent;
+        document.getElementById('detailPhone').innerText = phone;
+        document.getElementById('detailStudent').innerText = student || 'Chưa cập nhật';
+        document.getElementById('detailAge').innerText = age || '?';
+        document.getElementById('detailCourse').innerText = (course && course !== 'None') ? course : 'Chưa chọn';
+        document.getElementById('detailSchedule').innerText = (schedule && schedule !== 'None') ? schedule : 'Chưa chọn';
+        document.getElementById('detailSource').innerText = source || 'Không xác định';
+        
+        if(document.getElementById('detailAssignee')) document.getElementById('detailAssignee').innerText = assigneeName;
+        if(document.getElementById('currentAssigneeName')) document.getElementById('currentAssigneeName').innerText = assigneeName;
+
+        const assignForm = document.getElementById('assignForm');
+        let assignedId = dataEl.getAttribute('data-assigned-id');
+        if (assignForm) {
+            if (!assignedId || assignedId === "None" || assignedId === "") assignForm.classList.remove('d-none');
+            else assignForm.classList.add('d-none');
+        }
+
+        const notesEl = document.getElementById('notes-' + id);
+        const notesContent = notesEl ? notesEl.innerText : '';
+        const historyBox = document.getElementById('detailNotesHistory');
+        
+        if (notesContent.trim() !== "") historyBox.innerText = notesContent;
+        else historyBox.innerHTML = '<div class="text-center p-4 text-muted"><i class="bi bi-inbox fs-2 d-block mb-2 opacity-50"></i>Chưa có lịch sử chăm sóc.</div>';
+
+        new bootstrap.Modal(document.getElementById('leadDetailModal')).show();
+    }
+
+    function openAssignModal() {
+        isFromDetailModal = true;
+        bootstrap.Modal.getInstance(document.getElementById('leadDetailModal')).hide();
+        document.getElementById('modalAssignLeadId').value = document.getElementById('detail_hidden_id').value;
+        document.getElementById('assignModalParentName').innerText = document.getElementById('detail_hidden_parent').value;
+        setTimeout(() => { new bootstrap.Modal(document.getElementById('assignLeadModal')).show(); }, 400);
+    }
+
+    function openUpdateModal() {
+        isFromDetailModal = true;
+        document.getElementById('update_lead_id').value = document.getElementById('detail_hidden_id').value;
+        document.getElementById('update_student_name').value = document.getElementById('detail_hidden_student').value;
+        document.getElementById('update_age').value = document.getElementById('detail_hidden_age').value;
+        
+        updateDynamicFields('update');
+        
+        setTimeout(() => {
+            let courseVal = document.getElementById('detail_hidden_course').value;
+            if(courseVal && courseVal !== 'None') document.getElementById('update_course').value = courseVal;
+        }, 50);
+
+        let schedule = document.getElementById('detail_hidden_schedule').value; 
+        document.getElementById('update_pref_schedule').value = schedule;
+        if(schedule && schedule !== 'None') {
+            let parts = schedule.split(' (');
+            if(parts.length === 2) {
+                document.getElementById('update_day').value = parts[0].trim();
+                updateDynamicFields('update');
+                document.getElementById('update_time').value = parts[1].replace(')', '').trim();
+            }
+        } else {
+            document.getElementById('update_day').value = '';
+            document.getElementById('update_time').value = '';
+        }
+
+        var detailModal = bootstrap.Modal.getInstance(document.getElementById('leadDetailModal'));
+        if (detailModal) detailModal.hide();
+        setTimeout(() => { new bootstrap.Modal(document.getElementById('updateLeadModal')).show(); }, 400);
+    }
+
+    function openUpdateModalFromWon() {
+        let leadId = document.getElementById('wonLeadId').value;
+        let leadEl = document.querySelector(`.kanban-card[data-id="${leadId}"]`) || document.getElementById(`list-data-${leadId}`);
+        
+        if(leadEl) {
+            bootstrap.Modal.getInstance(document.getElementById('wonLeadModal')).hide();
+            document.getElementById('update_lead_id').value = leadId;
+            document.getElementById('update_student_name').value = leadEl.getAttribute('data-student') || '';
+            document.getElementById('update_age').value = leadEl.getAttribute('data-age') || '';
+            updateDynamicFields('update');
+            
+            setTimeout(() => {
+                let courseVal = leadEl.getAttribute('data-course');
+                if(courseVal && courseVal !== 'None') document.getElementById('update_course').value = courseVal || '';
+            }, 50);
+
+            let schedule = leadEl.getAttribute('data-schedule') || '';
+            document.getElementById('update_pref_schedule').value = schedule;
+            if(schedule && schedule !== 'None') {
+                let parts = schedule.split(' (');
+                if(parts.length === 2) {
+                    document.getElementById('update_day').value = parts[0].trim();
+                    updateDynamicFields('update');
+                    document.getElementById('update_time').value = parts[1].replace(')', '').trim();
+                }
+            } else {
+                document.getElementById('update_day').value = '';
+                document.getElementById('update_time').value = '';
+            }
+            setTimeout(() => { new bootstrap.Modal(document.getElementById('updateLeadModal')).show(); }, 400);
+        }
+    }
+
+    function openWonModalFromData(source) {
+        let id, parent, phone, student, age, course, schedule, modules, discount, starting_module;
+
+        if (source === 'fromDetail') {
+            id = document.getElementById('detail_hidden_id').value;
+            parent = document.getElementById('detail_hidden_parent').value;
+            phone = document.getElementById('detail_hidden_phone').value;
+            student = document.getElementById('detail_hidden_student').value;
+            age = document.getElementById('detail_hidden_age').value;
+            course = document.getElementById('detail_hidden_course').value;
+            schedule = document.getElementById('detail_hidden_schedule').value;
+            modules = document.getElementById('detail_hidden_modules').value;
+            discount = document.getElementById('detail_hidden_discount').value;
+            starting_module = document.getElementById('detail_hidden_starting_module').value;
+            bootstrap.Modal.getInstance(document.getElementById('leadDetailModal')).hide();
+        } else {
+            id = source.getAttribute('data-id');
+            parent = source.getAttribute('data-parent');
+            phone = source.getAttribute('data-phone');
+            student = source.getAttribute('data-student');
+            age = source.getAttribute('data-age');
+            course = source.getAttribute('data-course');
+            schedule = source.getAttribute('data-schedule'); 
+            modules = source.getAttribute('data-modules') || 1;
+            discount = source.getAttribute('data-discount') || 0;
+            starting_module = source.getAttribute('data-starting-module') || 1;
+        }
+
+        document.getElementById('wonLeadId').value = id;
+        document.getElementById('won_parent').innerText = parent || '';
+        document.getElementById('won_phone').innerText = phone || '';
+        document.getElementById('won_student').innerText = student || 'Chưa cập nhật';
+        document.getElementById('won_age').innerText = age || '?';
+        document.getElementById('won_course').innerText = (course && course !== 'None') ? course : 'Chưa chọn';
+        document.getElementById('won_schedule_display').innerText = (schedule && schedule !== 'None') ? schedule : 'Chưa chọn';
+        document.getElementById('won_schedule_hidden').value = (schedule && schedule !== 'None') ? schedule : '';
+        
+        document.getElementById('won_modules').value = modules;
+        document.getElementById('won_starting_module').value = starting_module; 
+        document.getElementById('won_discount').value = discount;
+
+        let btnSubmit = document.getElementById('btn_submit_won');
+        let isMissing = (!student || student.trim() === "" || student === 'None' ||
+                         !age || age.trim() === "" || age === 'None' ||
+                         !course || course.trim() === "" || course === 'None' ||
+                         !schedule || schedule.trim() === "" || schedule === 'None');
+
+        if (btnSubmit) btnSubmit.disabled = isMissing;
+
+        fetch(`/api/get-course-details/?course_name=${encodeURIComponent(course)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    document.getElementById('hidden_sessions_per_module').value = data.sessions_per_module;
+                    document.getElementById('hidden_price_per_module').value = data.price_per_module;
+                } else {
+                    document.getElementById('hidden_sessions_per_module').value = 12;
+                    document.getElementById('hidden_price_per_module').value = 5000000;
+                }
+                calculateTuition(); 
+            })
+            .catch(error => { calculateTuition(); });
+        
+        if (source === 'fromDetail') setTimeout(() => { new bootstrap.Modal(document.getElementById('wonLeadModal')).show(); }, 400);
+        else new bootstrap.Modal(document.getElementById('wonLeadModal')).show();
+    }
+
+    function triggerWonFromDetail() {
+        isFromDetailModal = true;
+        openWonModalFromData('fromDetail');
+    }
+
+    function openDuplicateLeadModal() {
+        isFromDetailModal = true;
+        const parentName = document.getElementById('detail_hidden_parent').value;
+        const phone = document.getElementById('detail_hidden_phone').value;
+
+        document.getElementById('detail_hidden_id').value = '';
+        document.getElementById('add_parent_name').value = parentName;
+        document.getElementById('add_phone').value = phone;
+        ['add_student_name', 'add_age', 'add_day', 'add_time'].forEach(id => document.getElementById(id).value = '');
+        updateDynamicFields('add');
+
+        var detailModalEl = document.getElementById('leadDetailModal');
+        var detailModal = bootstrap.Modal.getInstance(detailModalEl);
+        if (detailModal) detailModal.hide();
+
+        setTimeout(function() { new bootstrap.Modal(document.getElementById('addLeadModal')).show(); }, 400);
+    }
+
+    function calculateTuition() {
+        let modules = parseInt(document.getElementById('won_modules').value) || 0;
+        let discount = parseInt(document.getElementById('won_discount').value) || 0;
+        let sessionsPerModule = parseInt(document.getElementById('hidden_sessions_per_module').value) || 12;
+        let pricePerModule = parseInt(document.getElementById('hidden_price_per_module').value) || 5000000;
+        
+        let sessions = modules * sessionsPerModule;
+        let originalPrice = modules * pricePerModule;
+        let finalPrice = originalPrice - (originalPrice * (discount / 100));
+        
+        document.getElementById('won_sessions_display').innerText = sessions;
+        document.getElementById('won_tuition_fee').value = finalPrice.toLocaleString('en-US');
+    }
+</script>
+{% endblock %}

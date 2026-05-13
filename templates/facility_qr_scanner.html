@@ -1,0 +1,367 @@
+{% extends 'base.html' %}
+
+{% block title %}Quét mã Smart Lab - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    .select-truncate {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        padding-right: 30px; 
+    }
+    
+    /* GIAO DIỆN LIGHT MODE BÊN TRÁI */
+    .scanner-panel {
+        background-color: #ffffff; /* Nền trắng sáng */
+        border-radius: 16px;
+        padding: 25px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .scanner-panel .form-select, .scanner-panel .form-control {
+        background-color: #f8f9fa; /* Nền xám nhạt cho input */
+        color: #495057;
+        border: 1px solid #dee2e6;
+        font-weight: 600;
+    }
+    .scanner-panel .form-select:focus, .scanner-panel .form-control:focus {
+        border-color: #1D976C;
+        box-shadow: 0 0 0 0.25rem rgba(29, 151, 108, 0.15);
+        background-color: #ffffff;
+    }
+    
+    /* Tabs phong cách viên thuốc (Pill) */
+    .scanner-panel .nav-pills {
+        background-color: #f1f3f5 !important;
+        border: 1px solid #e9ecef;
+        padding: 4px;
+    }
+    .scanner-panel .nav-link { color: #6c757d; font-weight: 700; border-radius: 50px; transition: 0.2s;}
+    .scanner-panel .nav-link.active { background-color: #1D976C !important; color: white; box-shadow: 0 2px 5px rgba(29, 151, 108, 0.3); }
+    .scanner-panel .nav-link:hover:not(.active) { color: #1D976C; background-color: #eef9f5;}
+    
+    /* Khung Camera */
+    .camera-wrapper {
+        border-radius: 12px;
+        overflow: hidden;
+        border: 2px dashed #ced4da; /* Viền nét đứt cho khung quét */
+        background-color: #f8f9fa;
+        min-height: 350px;
+        position: relative;
+        transition: 0.3s;
+    }
+    .camera-wrapper:hover { border-color: #1D976C; }
+    #reader video { object-fit: cover !important; }
+    
+    /* GIAO DIỆN LIGHT MODE BÊN PHẢI */
+    .history-panel {
+        background-color: #ffffff;
+        border-radius: 16px;
+        padding: 25px;
+        height: 100%;
+        border: 1px solid #e9ecef;
+    }
+    .history-panel-header { color: #212529; border-bottom: 2px solid #f1f3f5; padding-bottom: 15px; margin-bottom: 15px; }
+    
+    .list-group-item.light-theme-item {
+        background-color: #f8f9fa;
+        border: 1px solid #e9ecef;
+        margin-bottom: 10px;
+        border-radius: 12px !important;
+        color: #495057;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .list-group-item.light-theme-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        background-color: #ffffff;
+        border-color: #1D976C;
+    }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-success">
+        <h4 class="fw-bold text-dark mb-1"><i class="bi bi-qr-code-scan text-success me-2"></i> Trạm Thiết bị</h4>
+        <p class="text-muted mb-0 small">Sử dụng Camera để quét mã để xác nhận nhanh.</p>
+    </div>
+
+    <div class="row g-4">
+        
+        <div class="col-12 col-lg-7 col-xl-8">
+            <div class="scanner-panel shadow-sm h-100">
+                
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="fw-bold small mb-2 text-secondary">1. Chọn lớp đang dạy (Nếu mượn):</label>
+                        <select id="classSelect" class="form-select shadow-none select-truncate py-2">
+                            <option value="" selected>-- Mở danh sách Lớp --</option>
+                            {% for c in active_classes %}
+                                <option value="{{ c.id }}">{{ c.class_code }} - {{ c.course.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="fw-bold small mb-2 text-secondary">2. Báo cáo Tình trạng (Nếu có lỗi):</label>
+                        <input type="text" id="scanNote" class="form-control shadow-none py-2" placeholder="VD: Mất dây cáp, gãy bánh xe...">
+                    </div>
+                </div>
+
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center mb-3 gap-3">
+                    <label class="fw-bold text-dark mb-0 fs-5"><i class="bi bi-camera-video text-primary me-2"></i>3. Camera Quét Mã</label>
+                    <ul class="nav nav-pills rounded-pill shadow-sm" id="scan-tabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active px-4 py-2" id="qr-tab" data-bs-toggle="pill" data-bs-target="#qr-pane" type="button"><i class="bi bi-qr-code-scan me-1"></i> Camera</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link px-4 py-2" id="manual-tab" data-bs-toggle="pill" data-bs-target="#manual-pane" type="button"><i class="bi bi-keyboard me-1"></i> Nhập Tay</button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="tab-content" id="scan-tabsContent">
+                    <div class="tab-pane fade show active" id="qr-pane" role="tabpanel">
+                        <div class="camera-wrapper shadow-sm">
+                            <div id="reader" style="width: 100%; border: none;"></div>
+                            
+                            <div id="camera-overlay" class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column justify-content-center align-items-center bg-light bg-opacity-75" style="z-index: 10; backdrop-filter: blur(4px);">
+                                <i class="bi bi-camera-video-off text-secondary opacity-50 mb-3" style="font-size: 4rem;"></i>
+                                <p class="text-secondary fw-bold small mb-4 text-center px-3">Hệ thống Camera đang tắt.<br>Nhấn nút bên dưới để bật.</p>
+                                <button class="btn btn-success rounded-pill fw-bold px-5 py-3 shadow" onclick="startCamera()">
+                                    <i class="bi bi-power me-2"></i> BẬT CAMERA
+                                </button>
+                            </div>
+
+                            <button id="stop-cam-btn" class="btn btn-danger position-absolute rounded-pill d-none shadow-sm border-2 border-white fw-bold px-4 py-2" style="top: 15px; right: 15px; z-index: 20;" onclick="stopCamera()">
+                                <i class="bi bi-stop-circle me-1"></i> TẮT CAMERA
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="manual-pane" role="tabpanel">
+                        <div class="camera-wrapper d-flex align-items-center justify-content-center border-0 bg-light" style="background: linear-gradient(145deg, #f8f9fa, #e9ecef);">
+                            <div class="text-center p-4 w-100 bg-white shadow-sm" style="max-width: 400px; border-radius: 20px; border: 1px solid #dee2e6;">
+                                <i class="bi bi-keyboard text-secondary opacity-25 d-block mb-3" style="font-size: 4rem;"></i>
+                                <input type="text" id="manualDeviceCode" class="form-control form-control-lg text-center fw-bold mb-3 shadow-inner" placeholder="Nhập mã (VD: TB001)" style="letter-spacing: 1px; text-transform: uppercase; border-color: #ced4da; color: #1D976C;">
+                                <button class="btn btn-primary w-100 rounded-pill fw-bold py-3 shadow-sm text-white" onclick="processManualInput()">
+                                    <i class="bi bi-check-circle-fill me-2"></i> XÁC NHẬN
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="resultBox" class="alert mt-4 shadow-sm text-center py-3 mb-0" style="display: none; border-radius: 12px; border: none;">
+                    <h5 id="resultMessage" class="mb-0 fw-bold"></h5>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-5 col-xl-4">
+            <div class="history-panel shadow-sm">
+                <div class="d-flex align-items-center justify-content-between history-panel-header">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-backpack-fill text-warning me-2"></i> Đang Giữ</h5>
+                    <span class="badge bg-warning text-dark rounded-pill">{{ my_borrowed_devices|length }} thiết bị</span>
+                </div>
+                
+                <ul class="list-group list-group-flush p-0 m-0" id="borrowed-list" style="max-height: calc(100vh - 250px); overflow-y: auto; padding-right: 5px;">
+                    {% for log in my_borrowed_devices %}
+                    <li class="list-group-item light-theme-item p-3 d-flex justify-content-between align-items-center" data-device-code="{{ log.device.device_code }}">
+                        <div>
+                            <h6 class="fw-bold text-dark mb-1">{{ log.device.name }}</h6>
+                            <small class="text-muted">Mã: <span class="fw-bold text-primary">{{ log.device.device_code }}</span> | Lớp: {{ log.for_class.class_code }}</small>
+                        </div>
+                        <span class="badge bg-warning bg-opacity-25 text-dark border border-warning rounded-pill shadow-sm py-2 px-3">Chưa trả</span>
+                    </li>
+                    {% empty %}
+                    <li id="empty-list-msg" class="list-group-item light-theme-item border-0 bg-transparent p-5 text-center text-secondary opacity-50 small d-flex flex-column align-items-center shadow-none">
+                        <i class="bi bi-box-seam fs-1 mb-2"></i>
+                        Tốt quá! Bạn không nợ thiết bị nào.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+    let isProcessing = false;
+    let html5QrCode = null;
+    let isCameraRunning = false;
+
+    // ÂM THANH BÍP SIÊU NHẸ
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep() {
+        if (audioCtx.state === 'suspended') { audioCtx.resume(); }
+        const oscillator = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        oscillator.type = 'sine';
+        oscillator.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        oscillator.start();
+        oscillator.stop(audioCtx.currentTime + 0.1); 
+    }
+
+    // ĐIỀU KHIỂN CAMERA
+    function startCamera() {
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+        document.getElementById('camera-overlay').classList.add('d-none');
+        document.getElementById('stop-cam-btn').classList.remove('d-none');
+
+        // Điều chỉnh khung quét
+        let containerWidth = document.getElementById('qr-pane').offsetWidth;
+        let qrboxSize = containerWidth < 400 ? 200 : 250;
+        
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: qrboxSize, height: qrboxSize }, aspectRatio: 1.0 },
+            onScanSuccess
+        ).then(() => { 
+            isCameraRunning = true; 
+            document.querySelector('.camera-wrapper').style.borderColor = '#1D976C'; // Đổi viền xanh khi camera bật
+        })
+         .catch(err => { resetCameraUI(); alert("Vui lòng cấp quyền Camera!"); });
+    }
+
+    function stopCamera() {
+        if (html5QrCode && isCameraRunning) {
+            html5QrCode.stop().then(() => {
+                isCameraRunning = false;
+                resetCameraUI();
+            });
+        }
+    }
+
+    function resetCameraUI() {
+        document.getElementById('camera-overlay').classList.remove('d-none');
+        document.getElementById('stop-cam-btn').classList.add('d-none');
+        document.querySelector('.camera-wrapper').style.borderColor = '#ced4da';
+    }
+
+    document.getElementById('manual-tab').addEventListener('shown.bs.tab', function () { stopCamera(); });
+
+    // GỌI API & CẬP NHẬT GIAO DIỆN KHÔNG CẦN TẢI LẠI TRANG (AJAX)
+    function handleDeviceTransaction(deviceCode) {
+        if (isProcessing) return; 
+        isProcessing = true;
+        
+        const classId = document.getElementById('classSelect').value;
+        const scanNote = document.getElementById('scanNote').value;
+        const rb = document.getElementById('resultBox');
+        const rm = document.getElementById('resultMessage');
+
+        if(isCameraRunning && html5QrCode) html5QrCode.pause(true); // Tạm dừng quét
+        
+        fetch('/api/manual_device_action/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device_code: deviceCode, class_id: classId, note: scanNote })
+        })
+        .then(res => res.json())
+        .then(data => {
+            rb.style.display = 'block';
+            
+            if(data.status === 'success') {
+                rb.className = 'alert bg-success text-white mt-4 shadow-lg py-3 mx-auto';
+                rm.innerHTML = `<i class="bi bi-check-circle-fill me-2 fs-4 align-middle"></i> ${data.message}`;
+                
+                // Cập nhật giao diện bên phải
+                updateBorrowedList(data.message, deviceCode, classId);
+
+            } else {
+                rb.className = 'alert bg-danger text-white mt-4 shadow-lg py-3 mx-auto';
+                rm.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2 fs-4 align-middle"></i> ${data.message}`;
+            }
+            
+            document.getElementById('manualDeviceCode').value = '';
+
+            // Tự động tắt thông báo sau 2 giây và mở khóa quét tiếp
+            setTimeout(() => { 
+                rb.style.display = 'none'; 
+                isProcessing = false; 
+                if(isCameraRunning && html5QrCode) html5QrCode.resume();
+            }, 2000); 
+        })
+        .catch(err => {
+            isProcessing = false;
+            if(isCameraRunning && html5QrCode) html5QrCode.resume();
+        });
+    }
+
+    function updateBorrowedList(message, deviceCode, classId) {
+        const list = document.getElementById('borrowed-list');
+        const emptyMsg = document.getElementById('empty-list-msg');
+        
+        // Cập nhật số lượng trên Header
+        const countBadge = document.querySelector('.history-panel-header .badge');
+        let currentCount = parseInt(countBadge.innerText);
+        
+        // Nếu là MƯỢN: Thêm 1 thẻ li vào danh sách
+        if (message.includes("MƯỢN")) {
+            if (emptyMsg) emptyMsg.remove(); 
+            
+            let selectBox = document.getElementById('classSelect');
+            let className = classId ? selectBox.options[selectBox.selectedIndex].text.split(' - ')[0] : 'N/A';
+            
+            let newLi = document.createElement('li');
+            newLi.className = "list-group-item light-theme-item p-3 d-flex justify-content-between align-items-center";
+            newLi.setAttribute("data-device-code", deviceCode);
+            newLi.innerHTML = `
+                <div>
+                    <h6 class="fw-bold text-dark mb-1 text-uppercase">${message.replace('Đã MƯỢN: ', '')}</h6>
+                    <small class="text-muted">Mã: <span class="fw-bold text-primary">${deviceCode}</span> | Lớp: ${className}</small>
+                </div>
+                <span class="badge bg-success bg-opacity-25 text-success border border-success rounded-pill shadow-sm py-2 px-3">Mới mượn</span>
+            `;
+            list.insertBefore(newLi, list.firstChild);
+            
+            // Tăng số đếm
+            if(isNaN(currentCount)) currentCount = 0;
+            countBadge.innerText = (currentCount + 1) + " thiết bị";
+        }
+        
+        // Nếu là TRẢ: Tìm thẻ li có mã tương ứng và xóa đi
+        else if (message.includes("TRẢ")) {
+            let items = list.getElementsByTagName('li');
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].getAttribute("data-device-code") === deviceCode) {
+                    items[i].remove();
+                    
+                    // Giảm số đếm
+                    if(!isNaN(currentCount) && currentCount > 0) {
+                        countBadge.innerText = (currentCount - 1) + " thiết bị";
+                    }
+                    break;
+                }
+            }
+            // Nếu xóa hết rồi thì hiện lại dòng trống
+            if (list.getElementsByTagName('li').length === 0) {
+                list.innerHTML = `<li id="empty-list-msg" class="list-group-item light-theme-item border-0 bg-transparent p-5 text-center text-secondary opacity-50 small d-flex flex-column align-items-center shadow-none"><i class="bi bi-box-seam fs-1 mb-2"></i>Tốt quá! Bạn không nợ thiết bị nào.</li>`;
+                countBadge.innerText = "0 thiết bị";
+            }
+        }
+    }
+
+    function onScanSuccess(decodedText, decodedResult) {
+        if (isProcessing) return; 
+        playBeep(); 
+        handleDeviceTransaction(decodedText);
+    }
+
+    function processManualInput() {
+        let code = document.getElementById('manualDeviceCode').value.trim().toUpperCase();
+        if (code) handleDeviceTransaction(code);
+    }
+</script>
+{% endblock %}

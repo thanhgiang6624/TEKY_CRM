@@ -1,0 +1,232 @@
+{% extends 'base.html' %}
+{% block title %}Đăng ký khuôn mặt AI - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    /* Nền tối phong cách High-tech */
+    .bg-slate-900 { background-color: #0f172a !important; }
+    .bg-slate-800 { background-color: #1e293b !important; }
+
+    /* Select2 DARK MODE CUSTOMIZATION */
+    .select2-container .select2-selection--single {
+        height: 45px !important; border: 1px solid #334155 !important;
+        border-radius: 12px !important; background-color: #0f172a !important; 
+        display: flex; align-items: center;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__rendered {
+        color: #f8fafc !important; font-weight: 500; padding-left: 15px;
+    }
+    .select2-container--default .select2-selection--single .select2-selection__arrow {
+        height: 43px !important; right: 10px !important;
+    }
+    .select2-dropdown {
+        background-color: #1e293b !important; border: 1px solid #334155 !important;
+        border-radius: 12px !important; box-shadow: 0 10px 25px rgba(0,0,0,0.5) !important;
+    }
+    .select2-search__field {
+        background-color: #0f172a !important; color: white !important;
+        border-radius: 8px !important; border: 1px solid #475569 !important; padding: 8px 12px !important;
+    }
+    .select2-results__option { color: #cbd5e1 !important; }
+    .select2-results__option--highlighted { background-color: #0dcaf0 !important; color: #000 !important; font-weight: bold; }
+    .select2-container--default .select2-selection--single .select2-selection__placeholder { color: #64748b !important; }
+    
+    .glow-border { border: 1px solid rgba(13, 202, 240, 0.2); box-shadow: 0 0 20px rgba(13, 202, 240, 0.1); }
+</style>
+
+<div class="container-fluid py-4 px-4 bg-slate-900" style="min-height: calc(100vh - 60px);">
+    
+    <div class="mb-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 text-white">
+        <div>
+            <h3 class="fw-bold mb-1"><i class="bi bi-person-bounding-box text-info me-2"></i> Đăng ký Khuôn mặt AI</h3>
+            <p class="text-secondary mb-0" id="aiStatusText">Trạng thái: Đang nghỉ. Camera đã tắt.</p>
+        </div>
+        <button id="toggleScanBtn" class="btn btn-info text-dark fw-bold rounded-pill px-5 py-2 shadow-lg" onclick="toggleScanning()">
+            <i class="bi bi-power me-2"></i> BẬT CAMERA
+        </button>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <div class="card bg-slate-800 border-0 shadow-lg glow-border d-flex flex-column" style="border-radius: 20px; overflow: hidden; height: 650px;">
+                
+                <div class="position-relative bg-black flex-grow-1 d-flex justify-content-center align-items-center">
+                    <div id="cameraOffMessage" class="text-center text-secondary">
+                        <i class="bi bi-camera-video-off fs-1 d-block mb-3 opacity-50"></i>
+                        <p class="mb-0 fw-bold opacity-50">Hãy nhấn BẬT CAMERA ở góc trên</p>
+                    </div>
+
+                    <video id="videoFeed" class="d-none" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);"></video>
+                    
+                    <div id="scanOverlay" class="position-absolute d-none" style="width: 260px; height: 320px; border: 3px dashed #0dcaf0; border-radius: 25px; pointer-events: none; box-shadow: 0 0 15px rgba(13, 202, 240, 0.3) inset;"></div>
+                </div>
+
+                <div class="card-footer bg-transparent border-top border-secondary border-opacity-25 py-4 text-center d-flex justify-content-center align-items-center" style="height: 85px;">
+                    <button class="btn btn-secondary rounded-pill fw-bold px-5 py-2 shadow-lg" id="captureBtn" onclick="captureAndUpload()" disabled>
+                        <i class="bi bi-camera-fill me-2"></i> CHỤP & PHÂN TÍCH AI
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card bg-slate-800 border-0 shadow-lg h-100" style="border-radius: 20px;">
+                <div class="card-body p-4">
+                    <h5 class="fw-bold text-white mb-4">Thông tin Học viên</h5>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-info small mb-2">1. Tìm và chọn học viên <span class="text-danger">*</span></label>
+                        <select id="studentSelect" class="form-select" style="width: 100%;">
+                            <option value=""></option> 
+                            {% for s in students %}
+                                <option value="{{ s.id }}">
+                                    {{ s.student_code }} - {{ s.full_name }} {% if s.face_data %}(Đã có DL){% endif %}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="alert bg-info bg-opacity-10 border border-info border-opacity-25 shadow-sm rounded-4 mt-4">
+                        <h6 class="fw-bold text-info"><i class="bi bi-lightbulb-fill text-warning me-2"></i> Chụp chuẩn:</h6>
+                        <ul class="mb-0 small text-light ps-3 mt-3 lh-lg">
+                            <li>Nhìn trực diện vào Camera.</li>
+                            <li>Khuôn mặt lọt trong <strong class="text-info">khung xanh</strong>.</li>
+                            <li>Không đeo khẩu trang, kính râm.</li>
+                        </ul>
+                    </div>
+
+                    <div id="resultMessage" class="mt-4 d-none p-3 rounded-4 fw-bold text-center"></div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <canvas id="hiddenCanvas" class="d-none"></canvas>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+<script>
+    let currentStream = null;
+    let isCameraOn = false;
+    const video = document.getElementById('videoFeed');
+    const canvas = document.getElementById('hiddenCanvas');
+    const ctx = canvas.getContext('2d');
+    const aiStatusText = document.getElementById('aiStatusText');
+    const resultMsg = document.getElementById('resultMessage');
+    const captureBtn = document.getElementById('captureBtn');
+    const toggleScanBtn = document.getElementById('toggleScanBtn');
+    
+    const cameraOffMessage = document.getElementById('cameraOffMessage');
+    const scanOverlay = document.getElementById('scanOverlay');
+
+    $(document).ready(function() {
+        $('#studentSelect').select2({ placeholder: "-- Gõ tên/mã học viên --", allowClear: true });
+    });
+
+    async function toggleScanning() {
+        if (!isCameraOn) {
+            try {
+                aiStatusText.innerText = 'Trạng thái: Đang xin quyền Camera...';
+                aiStatusText.className = 'text-warning small mb-0';
+                toggleScanBtn.disabled = true;
+
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                
+                video.srcObject = currentStream;
+                video.classList.remove('d-none');
+                cameraOffMessage.classList.add('d-none');
+                scanOverlay.classList.remove('d-none');
+                
+                isCameraOn = true;
+                aiStatusText.innerText = 'Trạng thái: Camera đang hoạt động';
+                aiStatusText.className = 'text-success small mb-0 fw-bold';
+                
+                toggleScanBtn.disabled = false;
+                toggleScanBtn.className = 'btn btn-danger fw-bold rounded-pill px-5 py-2 shadow-lg';
+                toggleScanBtn.innerHTML = '<i class="bi bi-stop-circle-fill me-2"></i> TẮT CAMERA';
+                
+                captureBtn.disabled = false;
+                captureBtn.classList.replace('btn-secondary', 'btn-info');
+                captureBtn.classList.add('text-dark');
+
+            } catch (err) {
+                console.error(err);
+                aiStatusText.innerText = 'Lỗi / Bị chặn quyền Camera';
+                aiStatusText.className = 'text-danger small mb-0 fw-bold';
+                toggleScanBtn.disabled = false;
+                alert("Không thể bật Camera. Vui lòng kiểm tra quyền trên trình duyệt!");
+            }
+        } else {
+            if (currentStream) { currentStream.getTracks().forEach(track => track.stop()); currentStream = null; }
+            
+            video.srcObject = null;
+            video.classList.add('d-none');
+            cameraOffMessage.classList.remove('d-none');
+            scanOverlay.classList.add('d-none');
+            
+            isCameraOn = false;
+            aiStatusText.innerText = 'Trạng thái: Đang nghỉ. Camera đã tắt.';
+            aiStatusText.className = 'text-secondary small mb-0';
+            
+            toggleScanBtn.className = 'btn btn-info text-dark fw-bold rounded-pill px-5 py-2 shadow-lg';
+            toggleScanBtn.innerHTML = '<i class="bi bi-power me-2"></i> BẬT CAMERA';
+            
+            captureBtn.disabled = true;
+            captureBtn.classList.replace('btn-info', 'btn-secondary');
+            captureBtn.classList.remove('text-dark');
+        }
+    }
+
+    function captureAndUpload() {
+        const studentId = $('#studentSelect').val(); 
+        if (!studentId) { alert("Vui lòng chọn một Học viên trước khi chụp!"); return; }
+
+        captureBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> ĐANG PHÂN TÍCH...';
+        captureBtn.disabled = true;
+        resultMsg.classList.add('d-none');
+
+        canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+        ctx.translate(canvas.width, 0); ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        canvas.toBlob(function(blob) {
+            let formData = new FormData();
+            formData.append('student_id', studentId);
+            formData.append('image', blob, 'face_capture.jpg');
+
+            fetch('/api/register_face/', {
+                method: 'POST', body: formData, headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+            })
+            .then(res => res.json())
+            .then(data => {
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<i class="bi bi-camera-fill me-2"></i> CHỤP & PHÂN TÍCH AI';
+                resultMsg.classList.remove('d-none');
+                if(data.status === 'success') {
+                    resultMsg.className = 'mt-4 p-3 rounded-4 fw-bold text-center bg-success text-white shadow-sm';
+                    resultMsg.innerHTML = `<i class="bi bi-check-circle-fill me-2"></i> ${data.message}`;
+                    let selectedOption = $('#studentSelect').find(':selected');
+                    if(!selectedOption.text().includes('(Đã có DL)')) {
+                        selectedOption.text(selectedOption.text() + ' (Đã có DL)');
+                        $('#studentSelect').trigger('change.select2'); 
+                    }
+                } else {
+                    resultMsg.className = 'mt-4 p-3 rounded-4 fw-bold text-center bg-danger text-white shadow-sm';
+                    resultMsg.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2"></i> LỖI: ${data.message}`;
+                }
+            })
+            .catch(err => {
+                captureBtn.disabled = false;
+                captureBtn.innerHTML = '<i class="bi bi-camera-fill me-2"></i> CHỤP & PHÂN TÍCH AI';
+                alert('Có lỗi mạng!');
+            });
+        }, 'image/jpeg', 0.9);
+    }
+</script>
+{% endblock %}

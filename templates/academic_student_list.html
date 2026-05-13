@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% block title %}Danh sách Học viên - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    /* Làm đẹp và kẻ bảng chuẩn form thiết kế */
+    .table-hover tbody tr:hover { background-color: #f8f9fa; transition: background-color 0.2s ease; }
+    .table-custom th { font-weight: 700; color: #6c757d; border-bottom: 2px solid #f1f3f5; border-top: none; letter-spacing: 0.5px; }
+    .table-custom td { vertical-align: middle; border-bottom: 1px solid #f8f9fa; padding: 1.2rem 0.5rem; }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+    
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-primary">
+        <h4 class="fw-bold text-dark mb-1">Danh sách Học viên</h4>
+        <p class="text-muted mb-0 small">Quản lý và tra cứu thông tin toàn bộ học viên tại cơ sở.</p>
+    </div>
+
+    <div class="mb-4 bg-white p-2 rounded-4 shadow-sm">
+        <form method="GET" action="" class="m-0">
+            <div class="row g-2 align-items-center">
+                
+                <div class="col-12 col-xl-4">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-0"><i class="bi bi-search text-muted"></i></span>
+                        <input type="text" name="search" class="form-control border-0 ps-0 shadow-none text-dark bg-transparent fw-bold" placeholder="Tên bé, mã học sinh..." value="{{ search_query }}">
+                    </div>
+                </div>
+
+                <div class="col-6 col-xl-3">
+                    <select name="class_id" class="form-select border-0 text-center text-muted shadow-none bg-light rounded-3 fw-bold" onchange="this.form.submit()">
+                        <option value="">-- Tất cả các Lớp --</option>
+                        {% for c in active_classes %}
+                            <option value="{{ c.id }}" {% if class_filter == c.id|stringformat:"s" %}selected{% endif %}>{{ c.class_code }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-6 col-xl-4">
+                    <select name="status" class="form-select border-0 text-center text-muted shadow-none bg-light rounded-3 fw-bold" onchange="this.form.submit()">
+                        <option value="">-- Trạng thái Hôm nay --</option>
+                        <option value="has_class" {% if status_filter == 'has_class' %}selected{% endif %}>📅 Có lịch học hôm nay</option>
+                        <option value="present" {% if status_filter == 'present' %}selected{% endif %}>🟢 Đang ở Trung tâm (Có mặt)</option>
+                        <option value="absent" {% if status_filter == 'absent' %}selected{% endif %}>🔴 Chưa đến (Vắng mặt)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="d-none"></button>
+                
+                {% if search_query or class_filter or status_filter %}
+                <div class="col-12 col-xl-1 text-end">
+                    <a href="?" class="btn btn-light text-danger border-0 rounded-3 w-100" title="Xóa bộ lọc"><i class="bi bi-x-lg"></i></a>
+                </div>
+                {% endif %}
+
+            </div>
+        </form>
+    </div>
+
+    <div class="card border-0 shadow-sm rounded-4 overflow-hidden mb-4 bg-white">
+        <div class="table-responsive px-2">
+            <table class="table table-hover table-custom mb-0">
+                <thead class="bg-white">
+                    <tr>
+                        <th class="ps-4 text-uppercase small" style="width: 12%;">Mã HS</th>
+                        <th class="text-uppercase small" style="width: 30%;">Học viên</th>
+                        <th class="text-uppercase small" style="width: 20%;">Phụ huynh</th>
+                        <th class="text-uppercase small" style="width: 23%;">Lớp & Trạng thái</th>
+                        <th class="pe-4 text-end text-uppercase small" style="width: 15%;">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white border-light">
+                    {% for student in page_obj %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">{{ student.student_code }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="bg-primary bg-opacity-10 text-primary rounded-circle d-flex justify-content-center align-items-center fw-bold me-3" style="width: 45px; height: 45px; font-size: 1.1rem;">
+                                    {{ student.full_name|make_list|first|upper }}
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-dark mb-1">{{ student.full_name }}</div>
+                                    <small class="text-muted"><i class="bi bi-cake2 me-1"></i>{{ student.dob|date:"d/m/Y"|default:"Chưa cập nhật" }}</small> 
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-dark mb-1">{{ student.get_parent_name|default:"N/A" }}</div>
+                            <small class="text-muted"><i class="bi bi-telephone-fill me-1 text-secondary opacity-75"></i> {{ student.get_phone|default:"N/A" }}</small>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-wrap gap-1 mb-2">
+                                {% for cls in student.my_classes %}
+                                    <span class="badge bg-light text-dark border px-2 py-1 shadow-sm">{{ cls.class_code }}</span>
+                                {% empty %}
+                                    <span class="badge bg-light text-muted border px-2 py-1 fst-italic">Chưa xếp lớp</span>
+                                {% endfor %}
+                            </div>
+                            
+                            {% if student.has_class_today %}
+                                {% if student.today_status == 'present' %}
+                                    <span class="badge bg-success bg-gradient rounded-pill shadow-sm px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> Đang ở Trung tâm</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark bg-gradient rounded-pill shadow-sm px-2 py-1"><i class="bi bi-clock-history me-1"></i> Lịch hôm nay (Chưa đến)</span>
+                                {% endif %}
+                            {% endif %}
+                        </td>
+                        <td class="pe-4 text-end">
+                            <a href="{% url 'student_360' student.id %}" class="btn btn-primary btn-sm rounded-pill px-4 py-2 fw-bold shadow-sm">
+                                <i class="bi bi-person-vcard me-1"></i> Hồ sơ 360°
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5 text-muted bg-white border-0">
+                            <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50 text-primary"></i>
+                            <h6 class="fw-bold">Không tìm thấy học viên nào!</h6>
+                            <p class="small mb-0">Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+        
+    {% if page_obj.has_other_pages %}
+    <div class="d-flex justify-content-center">
+        <nav>
+            <ul class="pagination pagination-sm shadow-sm rounded-pill overflow-hidden">
+                {% if page_obj.has_previous %}
+                    <li class="page-item"><a class="page-link px-3 text-dark fw-bold border-0 bg-white" href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}&class_id={{ class_filter }}&status={{ status_filter }}">Trước</a></li>
+                {% endif %}
+                
+                <li class="page-item active"><span class="page-link bg-primary border-primary fw-bold px-4">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+                
+                {% if page_obj.has_next %}
+                    <li class="page-item"><a class="page-link px-3 text-dark fw-bold border-0 bg-white" href="?page={{ page_obj.next_page_number }}&search={{ search_query }}&class_id={{ class_filter }}&status={{ status_filter }}">Sau</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}

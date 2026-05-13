@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% block title %}Hồ sơ Cá nhân - TEKY CRM{% endblock %}
+
+{% block content %}
+<style>
+    .profile-info-box {
+        background-color: #f8f9fa;
+        border-radius: 12px;
+        padding: 15px 20px;
+        margin-bottom: 15px;
+        border: 1px solid #e9ecef;
+    }
+    .profile-label { font-size: 0.8rem; font-weight: 700; color: #adb5bd; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .profile-value { font-size: 1.1rem; font-weight: 600; color: #212529; }
+    
+    .action-btn-group .btn {
+        padding: 15px 20px;
+        border-radius: 12px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        margin-bottom: 15px;
+        transition: all 0.2s ease;
+    }
+    .action-btn-group .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+    .action-btn-group .btn i { font-size: 1.2rem; width: 30px; }
+</style>
+
+<div class="container-fluid p-0 pb-5">
+
+    <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080; width: 100%; max-width: 400px; margin-top: 10px;">
+        {% if messages %}
+            {% for message in messages %}
+            <div class="toast align-items-center text-white {% if message.tags == 'success' %}bg-success{% else %}bg-danger{% endif %} border-0 mb-2 w-100 shadow" role="alert" aria-live="assertive" aria-atomic="true">
+                <div class="d-flex p-1">
+                    <div class="toast-body fw-bold">
+                        <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% else %}bi-exclamation-triangle-fill{% endif %} me-2 fs-6"></i>
+                        {{ message }}
+                    </div>
+                    <button type="button" class="btn-close btn-close-white me-3 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                </div>
+            </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+
+    <div class="row g-4">
+        
+        <div class="col-12 col-lg-8">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 20px;">
+                <div class="card-body p-4 p-xl-5">
+                    
+                    <div class="d-flex flex-column flex-sm-row align-items-center align-items-sm-start mb-5 pb-4 border-bottom border-light text-center text-sm-start">
+                        <div class="position-relative mb-3 mb-sm-0 me-sm-4">
+                            {% if request.user.avatar %}
+                                <img src="{{ request.user.avatar.url }}" class="rounded-circle object-fit-cover shadow-sm" style="width: 130px; height: 130px; border: 4px solid #eef9f5;">
+                            {% else %}
+                                <div class="rounded-circle shadow-sm d-flex align-items-center justify-content-center bg-primary bg-opacity-10 text-primary" style="width: 130px; height: 130px; border: 4px solid #eef9f5;">
+                                    <i class="bi bi-person-fill" style="font-size: 5rem;"></i>
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="pt-sm-2">
+                            <h2 class="fw-bold text-dark mb-1">{{ request.user.first_name|default:request.user.username }}</h2>
+                            <div class="text-muted mb-2">Mã nhân sự: <span class="fw-bold text-dark">#{{ request.user.id|stringformat:"04d" }}</span></div>
+                            <div class="badge bg-success bg-opacity-10 text-success border border-success rounded-pill px-3 py-2 mt-1">{{ request.user.get_role_display }}</div>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold text-dark mb-4"><i class="bi bi-info-circle-fill text-primary me-2"></i>Chi tiết Liên hệ</h5>
+                    
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="profile-info-box d-flex align-items-center h-100">
+                                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3 text-primary" style="width: 45px; height: 45px;">
+                                    <i class="bi bi-person-badge fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="profile-label">Tên đăng nhập (Username)</div>
+                                    <div class="profile-value">{{ request.user.username }}</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12 col-md-6">
+                            <div class="profile-info-box d-flex align-items-center h-100">
+                                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3 text-secondary" style="width: 45px; height: 45px;">
+                                    <i class="bi bi-building fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="profile-label">Cơ sở làm việc</div>
+                                    <div class="profile-value">TEKY Hà Nội</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-12 col-md-6">
+                            <div class="profile-info-box d-flex align-items-center h-100">
+                                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3 text-info" style="width: 45px; height: 45px;">
+                                    <i class="bi bi-envelope-at fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="profile-label">Địa chỉ Email</div>
+                                    <div class="profile-value">{{ request.user.email|default:"<span class='text-muted fst-italic fs-6'>Chưa cập nhật</span>"|safe }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <div class="profile-info-box d-flex align-items-center h-100">
+                                <div class="bg-white rounded-circle d-flex align-items-center justify-content-center shadow-sm me-3 text-warning" style="width: 45px; height: 45px;">
+                                    <i class="bi bi-telephone fs-5"></i>
+                                </div>
+                                <div>
+                                    <div class="profile-label">Số điện thoại</div>
+                                    <div class="profile-value">{{ request.user.phone|default:"<span class='text-muted fst-italic fs-6'>Chưa cập nhật</span>"|safe }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 20px; background: linear-gradient(to bottom, #ffffff, #f8f9fa);">
+                <div class="card-body p-4 p-xl-5">
+                    
+                    <div class="d-flex align-items-center mb-4 pb-3 border-bottom border-light">
+                        <div class="bg-dark text-white rounded-circle d-flex align-items-center justify-content-center me-3 shadow-sm" style="width: 45px; height: 45px;">
+                            <i class="bi bi-gear-fill fs-5"></i>
+                        </div>
+                        <h5 class="fw-bold text-dark mb-0">Thao tác Tài khoản</h5>
+                    </div>
+
+                    <div class="action-btn-group">
+                        <button type="button" class="btn btn-primary w-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#updateProfileModal">
+                            <i class="bi bi-pencil-square"></i> Cập nhật Thông tin
+                        </button>
+
+                        <button type="button" class="btn btn-warning text-dark w-100 shadow-sm" data-bs-toggle="modal" data-bs-target="#passwordModal">
+                            <i class="bi bi-key-fill"></i> Đổi Mật khẩu
+                        </button>
+
+                        <hr class="my-4 border-secondary opacity-25">
+
+                        <form method="POST" action="{% url 'logout' %}" class="w-100 m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-outline-danger border-2 w-100 bg-white">
+                                <i class="bi bi-box-arrow-right"></i> Đăng xuất an toàn
+                            </button>
+                        </form>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<div class="modal fade" id="updateProfileModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <div class="modal-header bg-primary bg-opacity-10 border-bottom-0 pb-0 px-4 pt-4">
+                <h5 class="modal-title fw-bold text-primary"><i class="bi bi-person-lines-fill me-2"></i>Cập nhật Hồ sơ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form method="POST" enctype="multipart/form-data" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="update_profile">
+                
+                <div class="modal-body p-4 pt-2">
+                    
+                    <div class="text-center mb-4 pb-3 border-bottom border-light">
+                        <label class="form-label small fw-bold text-secondary d-block mb-3">Ảnh đại diện (Avatar)</label>
+                        <div class="position-relative d-inline-block" style="cursor: pointer;" onclick="document.getElementById('avatarInput').click()">
+                            {% if request.user.avatar %}
+                                <img id="avatarPreview" src="{{ request.user.avatar.url }}" class="rounded-circle object-fit-cover shadow-sm" style="width: 100px; height: 100px; border: 3px solid #e9ecef;">
+                            {% else %}
+                                <div id="avatarPreview" class="rounded-circle shadow-sm d-flex align-items-center justify-content-center bg-light text-muted" style="width: 100px; height: 100px; border: 3px solid #e9ecef;">
+                                    <i class="bi bi-camera" style="font-size: 2.5rem;"></i>
+                                </div>
+                            {% endif %}
+                            
+                            <span class="position-absolute bottom-0 start-100 translate-middle p-2 bg-primary border border-light rounded-circle shadow" style="margin-left: -15px; margin-bottom: 5px;">
+                                <i class="bi bi-pencil-fill text-white" style="font-size: 0.7rem;"></i>
+                            </span>
+                        </div>
+                        <input type="file" id="avatarInput" name="avatar" class="d-none" accept="image/*" onchange="previewImage(event)">
+                        <div class="small text-muted mt-2">Bấm vào ảnh để tải lên (JPG, PNG)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary ms-1">Tên hiển thị (Họ và Tên)</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-fonts text-muted"></i></span>
+                            <input type="text" name="first_name" class="form-control border-0 bg-light py-2 fw-bold" placeholder="Nhập tên hiển thị" value="{{ request.user.first_name|default:'' }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-secondary ms-1">Địa chỉ Email</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-envelope text-muted"></i></span>
+                            <input type="email" name="email" class="form-control border-0 bg-light py-2 fw-bold text-primary" placeholder="Nhập địa chỉ Email" value="{{ request.user.email|default:'' }}" pattern="[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$" title="Vui lòng nhập email hợp lệ">
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small fw-bold text-secondary ms-1">Số điện thoại</label>
+                        <div class="input-group shadow-sm rounded-3 overflow-hidden">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-telephone text-muted"></i></span>
+                            <input type="tel" name="phone" class="form-control border-0 bg-light py-2 fw-bold text-primary" placeholder="Nhập SĐT (10 số)" value="{{ request.user.phone|default:'' }}" pattern="0[0-9]{9}" maxlength="10" title="SĐT phải có 10 chữ số và bắt đầu bằng số 0">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 pb-4 px-4 pt-0 justify-content-between">
+                    <button type="button" class="btn btn-light rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-5 fw-bold shadow-sm"><i class="bi bi-save me-2"></i> LƯU THAY ĐỔI</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="passwordModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 rounded-4">
+            <div class="modal-header bg-dark border-bottom-0 pb-0 px-4 pt-4 text-white rounded-top-4">
+                <h5 class="modal-title fw-bold"><i class="bi bi-shield-lock me-2 text-warning"></i> Đổi Mật Khẩu</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form method="POST" action="">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="change_password">
+                
+                <div class="modal-body px-4 py-4 bg-dark text-white">
+                    {% for field in password_form %}
+                        <div class="mb-3">
+                            <label class="form-label small fw-bold text-light opacity-75">{{ field.label }}</label>
+                            <input type="{{ field.field.widget.input_type }}" name="{{ field.html_name }}" class="form-control py-2 rounded-3 bg-secondary bg-opacity-25 border-0 text-white shadow-none" required>
+                        </div>
+                    {% endfor %}
+                </div>
+                
+                <div class="modal-footer border-0 pb-4 px-4 pt-0 bg-dark rounded-bottom-4 justify-content-between">
+                    <button type="button" class="btn btn-outline-light border-0 rounded-pill px-4 fw-bold" data-bs-dismiss="modal">Hủy bỏ</button>
+                    <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold text-dark shadow-sm">Xác nhận Đổi</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Khởi động Toast tự động ẩn
+    document.addEventListener("DOMContentLoaded", function(){
+        var toastElList = [].slice.call(document.querySelectorAll('.toast'));
+        var toastList = toastElList.map(function (toastEl) {
+            return new bootstrap.Toast(toastEl, { delay: 3500 });
+        });
+        toastList.forEach(toast => toast.show());
+    });
+
+    // Preview Avatar
+    function previewImage(event) {
+        var reader = new FileReader();
+        reader.onload = function() {
+            var output = document.getElementById('avatarPreview');
+            if(output.tagName.toLowerCase() === 'div') {
+                var img = document.createElement('img');
+                img.id = 'avatarPreview';
+                img.className = 'rounded-circle object-fit-cover shadow-sm';
+                img.style.width = '100px';
+                img.style.height = '100px';
+                img.style.border = '3px solid #e9ecef';
+                output.parentNode.replaceChild(img, output);
+                output = img;
+            }
+            output.src = reader.result;
+        };
+        if(event.target.files[0]){
+            reader.readAsDataURL(event.target.files[0]);
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,206 @@
+{% extends 'base.html' %}
+{% block title %}Duyệt đơn Giáo viên - TEKY CRM{% endblock %}
+
+{% block content %}
+<div class="container-fluid p-0 pb-5">
+    <div class="mb-4 bg-white p-3 rounded-4 shadow-sm border-start border-4 border-danger d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Duyệt đơn Giáo viên</h4>
+            <p class="text-muted mb-0 small">Quản lý và phân công người dạy thay cho các đơn xin nghỉ / rút lớp.</p>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-12 col-xl-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0">Đơn xin nghỉ buổi</h5>
+                    <span class="badge bg-danger">{{ pending_absences|length }}</span>
+                </div>
+                <div class="card-body px-4">
+                    {% for req in pending_absences %}
+                    <div class="p-3 mb-3 bg-light rounded-4 border teacher-request-card" id="req-absence-{{ req.id }}" style="transition: 0.3s;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0 text-primary">{{ req.teacher.first_name|default:req.teacher.username }}</h6>
+                            <span class="badge bg-secondary">Ngày nghỉ: {{ req.absence_date|date:"d/m/Y" }}</span>
+                        </div>
+                        <p class="small text-muted mb-2">Lớp: {{ req.target_class.class_code }}</p>
+                        <p class="small mb-3 text-dark bg-white p-2 rounded border-start border-warning border-3">Lý do: {{ req.reason }}</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-success btn-sm fw-bold flex-grow-1" onclick="openSubstituteModal({{ req.id }}, '{{ req.target_class.class_code }}', '{{ req.absence_date|date:'d/m/Y' }}')">Duyệt & Đổi GV</button>
+                            <button class="btn btn-outline-danger btn-sm fw-bold flex-grow-1" onclick="handleRequest('absence', {{ req.id }}, 'reject')">Từ chối</button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-5">Không có đơn xin nghỉ nào.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-xl-6">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-4 pb-2 px-4 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold text-dark mb-0">Đơn xin rút lớp vĩnh viễn</h5>
+                    <span class="badge bg-danger">{{ pending_resignations|length }}</span>
+                </div>
+                <div class="card-body px-4">
+                    {% for req in pending_resignations %}
+                    <div class="p-3 mb-3 bg-light rounded-4 border border-danger border-opacity-25 teacher-request-card" id="req-resignation-{{ req.id }}" style="transition: 0.3s;">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0 text-danger">{{ req.teacher.first_name|default:req.teacher.username }}</h6>
+                        </div>
+                        <p class="small text-muted mb-2">Xin rút khỏi lớp: {{ req.target_class.class_code }}</p>
+                        <p class="small mb-3 text-dark bg-white p-2 rounded border-start border-danger border-3">Lý do: {{ req.reason }}</p>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-danger btn-sm fw-bold flex-grow-1" onclick="openReplaceTeacherModal({{ req.id }}, '{{ req.target_class.class_code }}')">Chấp thuận & Đổi GV</button>
+                            <button class="btn btn-outline-secondary btn-sm fw-bold flex-grow-1" onclick="handleRequest('resignation', {{ req.id }}, 'reject')">Từ chối</button>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted py-5">Mọi lớp học đều ổn định.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="substituteTeacherModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-success bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-success"><i class="bi bi-person-bounding-box me-2"></i>Chỉ định Dạy thay</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pb-2">
+                <p class="small text-muted mb-3">Lớp <strong id="subClassCode" class="text-dark"></strong> nghỉ ngày <strong id="subDate" class="text-danger"></strong>.</p>
+                <input type="hidden" id="absenceReqId" value="">
+                <div class="mb-3">
+                    <div class="dropdown">
+                        <button class="btn btn-light border border-success w-100 text-start d-flex justify-content-between align-items-center shadow-none fw-bold" type="button" id="dropdownSubTeacherBtn" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 10px 15px;">
+                            <span id="selectedSubTeacherText" class="text-muted">-- Chọn Giáo viên --</span>
+                            <i class="bi bi-chevron-down text-muted"></i>
+                        </button>
+                        <ul class="dropdown-menu w-100 shadow border-0 mt-1 p-2" aria-labelledby="dropdownSubTeacherBtn">
+                            <li>
+                                <div class="input-group input-group-sm mb-2" onclick="event.stopPropagation()">
+                                    <span class="input-group-text bg-white border-success"><i class="bi bi-search text-success"></i></span>
+                                    <input type="text" class="form-control border-success border-start-0 shadow-none" id="searchSubTeacherInput" placeholder="Tìm tên..." onkeyup="filterSubTeachers()">
+                                </div>
+                            </li>
+                            <div id="subTeacherListContainer" style="max-height: 220px; overflow-y: auto;">
+                                {% for t in teachers %}
+                                    <li><a class="dropdown-item sub-teacher-item rounded py-2 small fw-bold text-dark" href="javascript:void(0)" onclick="selectSubTeacher('{{ t.id }}', '{{ t.first_name|default:t.username }}')"><i class="bi bi-person-circle me-2 text-muted"></i>{{ t.first_name|default:t.username }}</a></li>
+                                {% endfor %}
+                                <li id="noSubTeacherFound" class="text-center text-muted small py-3" style="display: none;">Không tìm thấy.</li>
+                            </div>
+                        </ul>
+                    </div>
+                    <input type="hidden" id="new_sub_teacher_hidden" value="">
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-success rounded-pill px-4 py-2 fw-bold shadow-sm" onclick="submitSubstituteTeacher()">Duyệt & Phân công</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="replaceTeacherModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content border-0 shadow-lg rounded-4">
+            <div class="modal-header bg-danger bg-opacity-10 border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold text-danger"><i class="bi bi-person-lines-fill me-2"></i>Chỉ định GV thay thế</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4 pb-2">
+                <p class="small text-muted mb-3">Tìm giáo viên dạy thay cho lớp <strong id="replaceClassCode" class="text-dark"></strong>.</p>
+                <input type="hidden" id="resignationReqId" value="">
+                <div class="mb-3">
+                    <div class="dropdown">
+                        <button class="btn btn-light border border-danger w-100 text-start d-flex justify-content-between align-items-center shadow-none fw-bold" type="button" id="dropdownTeacherBtn" data-bs-toggle="dropdown" aria-expanded="false" style="padding: 10px 15px;">
+                            <span id="selectedTeacherText" class="text-muted">-- Chọn Giáo viên --</span>
+                            <i class="bi bi-chevron-down text-muted"></i>
+                        </button>
+                        <ul class="dropdown-menu w-100 shadow border-0 mt-1 p-2" aria-labelledby="dropdownTeacherBtn">
+                            <li>
+                                <div class="input-group input-group-sm mb-2" onclick="event.stopPropagation()">
+                                    <span class="input-group-text bg-white border-primary"><i class="bi bi-search text-primary"></i></span>
+                                    <input type="text" class="form-control border-primary border-start-0 shadow-none" id="searchTeacherInput" placeholder="Tìm tên..." onkeyup="filterTeachers()">
+                                </div>
+                            </li>
+                            <div id="teacherListContainer" style="max-height: 220px; overflow-y: auto;">
+                                {% for t in teachers %}
+                                    <li><a class="dropdown-item teacher-item rounded py-2 small fw-bold text-dark" href="javascript:void(0)" onclick="selectTeacher('{{ t.id }}', '{{ t.first_name|default:t.username }}')"><i class="bi bi-person-circle me-2 text-muted"></i>{{ t.first_name|default:t.username }}</a></li>
+                                {% endfor %}
+                                <li id="noTeacherFound" class="text-center text-muted small py-3" style="display: none;">Không tìm thấy.</li>
+                            </div>
+                        </ul>
+                    </div>
+                    <input type="hidden" id="new_teacher_select_hidden" value="">
+                </div>
+            </div>
+            <div class="modal-footer border-0 pt-0 pb-4 justify-content-center">
+                <button type="button" class="btn btn-danger rounded-pill px-4 py-2 fw-bold shadow-sm" onclick="submitReplaceTeacher()">Duyệt & Đổi GV</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function handleRequest(type, id, action) {
+        if (!confirm(`Xác nhận thao tác?`)) return;
+        let fd = new FormData(); fd.append('type', type); fd.append('id', id); fd.append('action', action);
+        fetch('/api/process_request/', { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{csrf_token}}'}})
+        .then(r => r.json()).then(d => { if(d.status==='success') window.location.reload(); });
+    }
+
+    /* Logic Teacher Modal 1 */
+    function openSubstituteModal(reqId, classCode, dateStr) {
+        document.getElementById('absenceReqId').value = reqId; document.getElementById('subClassCode').innerText = classCode; document.getElementById('subDate').innerText = dateStr;
+        document.getElementById("new_sub_teacher_hidden").value = ''; document.getElementById("selectedSubTeacherText").innerText = '-- Chọn Giáo viên --';
+        new bootstrap.Modal(document.getElementById('substituteTeacherModal')).show();
+    }
+    function filterSubTeachers() {
+        let input = document.getElementById("searchSubTeacherInput").value.toLowerCase();
+        let items = document.querySelectorAll(".sub-teacher-item"); let count = 0;
+        items.forEach(i => { if (i.innerText.toLowerCase().includes(input)) { i.parentElement.style.display = ""; count++; } else { i.parentElement.style.display = "none"; } });
+        document.getElementById("noSubTeacherFound").style.display = (count === 0) ? "block" : "none";
+    }
+    function selectSubTeacher(id, name) {
+        document.getElementById("new_sub_teacher_hidden").value = id;
+        document.getElementById("selectedSubTeacherText").innerText = name;
+        bootstrap.Dropdown.getInstance(document.getElementById('dropdownSubTeacherBtn')).hide();
+    }
+    function submitSubstituteTeacher() {
+        let tid = document.getElementById('new_sub_teacher_hidden').value; if(!tid) return alert("Chọn giáo viên!");
+        let fd = new FormData(); fd.append('type', 'absence'); fd.append('id', document.getElementById('absenceReqId').value); fd.append('action', 'approve'); fd.append('new_teacher_id', tid);
+        fetch('/api/process_request/', { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{ csrf_token }}'} }).then(r => r.json()).then(d => { alert(d.message); window.location.reload(); });
+    }
+
+    /* Logic Teacher Modal 2 */
+    function openReplaceTeacherModal(reqId, classCode) {
+        document.getElementById('resignationReqId').value = reqId; document.getElementById('replaceClassCode').innerText = classCode;
+        document.getElementById("new_teacher_select_hidden").value = ''; document.getElementById("selectedTeacherText").innerText = '-- Chọn Giáo viên --';
+        new bootstrap.Modal(document.getElementById('replaceTeacherModal')).show();
+    }
+    function filterTeachers() {
+        let input = document.getElementById("searchTeacherInput").value.toLowerCase();
+        let items = document.querySelectorAll(".teacher-item"); let count = 0;
+        items.forEach(i => { if (i.innerText.toLowerCase().includes(input)) { i.parentElement.style.display = ""; count++; } else { i.parentElement.style.display = "none"; } });
+        document.getElementById("noTeacherFound").style.display = (count === 0) ? "block" : "none";
+    }
+    function selectTeacher(id, name) {
+        document.getElementById("new_teacher_select_hidden").value = id; document.getElementById("selectedTeacherText").innerText = name;
+        bootstrap.Dropdown.getInstance(document.getElementById('dropdownTeacherBtn')).hide();
+    }
+    function submitReplaceTeacher() {
+        let tid = document.getElementById('new_teacher_select_hidden').value; if(!tid) return alert("Chọn giáo viên!");
+        let fd = new FormData(); fd.append('type', 'resignation'); fd.append('id', document.getElementById('resignationReqId').value); fd.append('action', 'approve'); fd.append('new_teacher_id', tid);
+        fetch('/api/process_request/', { method: 'POST', body: fd, headers: {'X-CSRFToken': '{{ csrf_token }}'} }).then(r => r.json()).then(d => { alert(d.message); window.location.reload(); });
+    }
+</script>
+{% endblock %}

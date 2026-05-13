@@ -1,0 +1,436 @@
+{% extends 'base.html' %}
+{% block title %}Buổi học {{ target_date|date:"d/m/Y" }}{% endblock %}
+
+{% block content %}
+{% now "Y-m-d" as current_date %}
+{% with target_str=target_date|date:"Y-m-d" %}
+
+<div class="container-fluid p-0 pb-5">
+    
+    <div class="toast-container position-fixed top-0 start-50 translate-middle-x p-3" style="z-index: 1080; width: 100%; max-width: 400px; margin-top: 10px;">
+        <div id="liveToast" class="toast align-items-center text-white border-0 mb-2 w-100 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex p-2">
+                <div class="toast-body fw-bold" id="toastMessage">
+                    <i class="bi bi-check-circle-fill me-2"></i> Đã lưu thành công!
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold text-dark mb-0"><i class="bi bi-journal-bookmark-fill text-primary me-2"></i> Chi tiết Lớp học</h3>
+        <a href="javascript:history.back()" class="btn btn-outline-secondary rounded-pill bg-white shadow-sm fw-bold px-4"><i class="bi bi-arrow-left me-1"></i> Quay lại</a>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-lg-5">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 15px; background: linear-gradient(135deg, #1D976C, #93F9B9); color: white;">
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h3 class="fw-bold mb-1">{{ target_class.class_code }}</h3>
+                            <p class="mb-0 opacity-75 fs-6">{{ target_class.course.name }}</p>
+                        </div>
+                        <button type="button" class="btn btn-warning text-dark fw-bold rounded-pill shadow-sm {% if target_str <= current_date %}d-none{% endif %}" data-bs-toggle="modal" data-bs-target="#absenceModal" style="padding: 8px 20px;">
+                            Báo nghỉ dạy
+                        </button>
+                    </div>
+                    
+                    <div class="bg-dark bg-opacity-25 rounded-4 p-3 d-flex flex-wrap gap-3">
+                        <div><i class="bi bi-calendar-event me-1"></i> Ngày: <strong>{{ target_date|date:"d/m/Y" }}</strong></div>
+                        <div><i class="bi bi-clock me-1"></i> Giờ: <strong>{{ target_class.time_slot }}</strong></div>
+                        <div><i class="bi bi-people-fill me-1"></i> Sĩ số: <strong>{{ student_data|length }}</strong></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-7">
+            <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+                <div class="card-body p-4">
+                    <h6 class="fw-bold text-dark mb-2"><i class="bi bi-journal-text text-primary me-2"></i> Nội dung bài học hôm nay</h6>
+                    <textarea class="form-control bg-light border-0 shadow-none p-3 h-75 {% if not can_edit %}opacity-75{% endif %}" placeholder="Chưa có nội dung giảng dạy..." style="border-radius: 12px; resize: none;" onblur="autoSaveLessonContent(this.value)" {% if not can_edit %}readonly{% endif %}>{{ lesson_content.content|default:"" }}</textarea>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if not can_edit %}
+        <div class="alert alert-secondary border-0 shadow-sm mb-4 d-flex align-items-center px-4 py-3" style="border-radius: 15px;">
+            <i class="bi bi-eye-fill fs-3 me-3 text-primary"></i>
+            <div>
+                <strong class="text-dark">Chế độ xem lại (Read-only)</strong><br>
+                <span class="small text-muted">Bạn đang xem dữ liệu của một ngày khác. Không thể điểm danh hay chỉnh sửa thông tin trong chế độ này{% if target_str >= current_date %}, <strong>nhưng bạn vẫn có thể gửi đơn Báo nghỉ dạy</strong>.{% else %}.{% endif %}</span>
+            </div>
+        </div>
+    {% endif %}
+
+    <ul class="nav nav-pills nav-fill bg-white shadow-sm p-2 rounded-pill mb-4" id="sessionTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active rounded-pill fw-bold py-3" id="tab-btn-attendance" data-bs-toggle="pill" data-bs-target="#tab-attendance" type="button">
+                <i class="bi bi-person-check-fill fs-5 me-2"></i>Điểm danh
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold py-3" id="tab-btn-notes" data-bs-toggle="pill" data-bs-target="#tab-notes" type="button">
+                <i class="bi bi-chat-quote-fill fs-5 me-2"></i>Nhận xét
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link rounded-pill fw-bold py-3" id="tab-btn-photos" data-bs-toggle="pill" data-bs-target="#tab-photos" type="button">
+                <i class="bi bi-images fs-5 me-2"></i>Hình ảnh lớp
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="sessionTabsContent">
+        
+        <div class="tab-pane fade show active" id="tab-attendance" role="tabpanel">
+            <div class="row g-3">
+                {% for item in student_data %}
+                <div class="col-12 col-md-6 col-xl-4">
+                    <div class="card border-0 shadow-sm {% if item.enrollment.status == 'reserved' or item.enrollment.remaining_sessions <= 0 %}bg-light border border-danger border-opacity-25{% endif %}" style="border-radius: 15px;">
+                        <div class="card-body p-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold {% if item.enrollment.remaining_sessions <= 0 or item.enrollment.status == 'reserved' %}text-danger text-decoration-line-through{% else %}text-dark{% endif %} mb-1">
+                                    {{ item.student.full_name }}
+                                </h6>
+                                <small class="text-muted">Mã: {{ item.student.student_code }}</small>
+                                
+                                {% if item.enrollment.status == 'reserved' %}
+                                    <div class="mt-1"><span class="badge bg-secondary"><i class="bi bi-pause-fill"></i> Bảo lưu</span></div>
+                                {% elif item.enrollment.remaining_sessions <= 0 %}
+                                    <div class="mt-1"><span class="badge bg-danger"><i class="bi bi-lock-fill"></i> Hết phí</span></div>
+                                {% elif item.enrollment.remaining_sessions <= 4 %}
+                                    <div class="mt-1"><span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle-fill"></i> Còn {{ item.enrollment.remaining_sessions }} buổi</span></div>
+                                {% endif %}
+                            </div>
+                            
+                            <button class="btn rounded-pill fw-bold shadow-sm attendance-btn 
+                                {% if item.enrollment.status == 'reserved' or item.enrollment.remaining_sessions <= 0 %}btn-secondary opacity-50
+                                {% elif item.status == 'present' %}btn-success
+                                {% else %}btn-danger{% endif %} 
+                                {% if not can_edit %}opacity-50{% endif %}" 
+                                data-student-id="{{ item.student.id }}" data-status="{{ item.status|default:'absent' }}"
+                                onclick="toggleAttendance(this)" style="min-width: 110px;" 
+                                {% if not can_edit or item.enrollment.status == 'reserved' or item.enrollment.remaining_sessions <= 0 %}disabled{% endif %}>
+                                
+                                {% if item.enrollment.status == 'reserved' %}
+                                    <i class="bi bi-pause-fill"></i> Tạm dừng
+                                {% elif item.enrollment.remaining_sessions <= 0 %}
+                                    <i class="bi bi-lock-fill"></i> Khóa
+                                {% elif item.status == 'present' %} 
+                                    Có mặt 
+                                {% else %} 
+                                    Vắng 
+                                {% endif %}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center p-5 text-muted">Lớp chưa có học viên.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-notes" role="tabpanel">
+            <div class="row g-3" id="notes-container">
+                {% for item in student_data %}
+                <div class="col-12 col-md-6 col-xl-4 note-card-wrapper {% if item.status != 'present' %}d-none{% endif %}" id="note-card-{{ item.student.id }}">
+                    <div class="card border-0 shadow-sm h-100" style="border-radius: 15px;">
+                        <div class="card-body p-3 d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="fw-bold text-dark mb-1">{{ item.student.full_name }}</h6>
+                                <p class="text-primary small mb-0 fst-italic text-truncate" style="max-width: 150px;" id="display-note-{{ item.student.id }}">{{ item.note|default:"Chưa nhận xét..." }}</p>
+                            </div>
+                            {% if can_edit %}
+                            <button class="btn btn-outline-primary rounded-pill fw-bold btn-sm px-3" onclick="openNoteModal('{{ item.student.id }}', '{{ item.student.full_name }}')">
+                                Nhận xét
+                            </button>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+                <div class="col-12 text-center p-5 text-muted d-none" id="no-present-student-msg">
+                    Chưa có học viên nào được điểm danh "Có mặt".
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-photos" role="tabpanel">
+            <div class="card border-0 shadow-sm" style="border-radius: 15px;">
+                <div class="card-body p-4 text-center">
+                    
+                    {% if can_edit %}
+                    <button type="button" class="btn btn-primary rounded-pill fw-bold py-3 px-5 shadow-sm mb-4" data-bs-toggle="modal" data-bs-target="#photoModal">
+                        <i class="bi bi-cloud-arrow-up-fill me-2"></i> Tải ảnh lớp học lên (Tối đa 10 ảnh)
+                    </button>
+                    {% endif %}
+
+                    {% if class_images %}
+                    <div class="text-start">
+                        <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-check2-circle text-success me-1"></i> Ảnh đã đăng trong buổi này:</h6>
+                        <div class="row g-2">
+                            {% for img in class_images %}
+                            <div class="col-6 col-md-3">
+                                <img src="{{ img.image.url }}" class="img-fluid rounded-3 border shadow-sm" style="height: 140px; width: 100%; object-fit: cover;">
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                        {% if not can_edit %}
+                        <div class="text-muted py-4">
+                            <i class="bi bi-images fs-1 d-block mb-2 opacity-50"></i>
+                            Không có ảnh nào được tải lên trong buổi học này.
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                    
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    {% if target_str >= current_date %}
+        <div class="modal fade" id="absenceModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header border-0 pb-0 pt-4 px-4">
+                        <h5 class="modal-title fw-bold text-dark"><i class="bi bi-calendar-x text-warning me-2"></i>Báo nghỉ dạy</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <form method="POST" action="">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="request_absence">
+                        <input type="hidden" name="absence_date" value="{{ target_date|date:'Y-m-d' }}">
+                        <div class="modal-body px-4">
+                            <textarea name="reason" class="form-control bg-light border-0 shadow-sm p-3 mt-3" style="border-radius: 12px;" rows="3" placeholder="Lý do xin nghỉ..." required></textarea>
+                        </div>
+                        <div class="modal-footer border-0 pb-4 justify-content-center">
+                            <button type="submit" class="btn btn-warning text-dark rounded-pill px-5 py-2 fw-bold shadow-sm">Gửi yêu cầu</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if can_edit %}
+        <div class="modal fade" id="noteModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header border-0 pb-0 pt-4 px-4">
+                        <h5 class="modal-title fw-bold text-primary" id="noteModalTitle">Nhận xét</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body px-4 pt-3 pb-2">
+                        <input type="hidden" id="modalStudentId">
+                        <textarea id="modalNoteText" class="form-control mb-4 bg-light border-0 shadow-sm p-3" rows="4" style="border-radius: 15px;" placeholder="Gõ nhận xét..."></textarea>
+                        
+                        <div class="d-flex flex-column gap-2">
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill text-start fw-bold" onclick="addSuggestion('Giao tiếp tốt, tự tin trình bày ý tưởng (Communication).')"><i class="bi bi-chat-dots text-primary me-2"></i>Giao tiếp (Communication)</button>
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill text-start fw-bold" onclick="addSuggestion('Hợp tác làm việc nhóm rất hiệu quả (Collaboration).')"><i class="bi bi-people text-success me-2"></i>Hợp tác (Collaboration)</button>
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill text-start fw-bold" onclick="addSuggestion('Có tư duy phản biện, logic giải quyết vấn đề tốt (Critical Thinking).')"><i class="bi bi-gear text-danger me-2"></i>Tư duy (Critical Thinking)</button>
+                            <button class="btn btn-outline-secondary btn-sm rounded-pill text-start fw-bold" onclick="addSuggestion('Rất sáng tạo trong việc thiết kế sản phẩm (Creativity).')"><i class="bi bi-lightbulb text-warning me-2"></i>Sáng tạo (Creativity)</button>
+                        </div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 mt-3 px-4 pb-4">
+                        <button type="button" class="btn btn-success w-100 rounded-pill fw-bold py-3 shadow-sm" onclick="saveNote()">LƯU NHẬN XÉT</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal fade" id="photoModal" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content border-0 shadow-lg" style="border-radius: 20px;">
+                    <div class="modal-header border-0 pb-0 pt-4 px-4">
+                        <h5 class="modal-title fw-bold text-dark"><i class="bi bi-images text-success me-2"></i>Tải ảnh lớp học</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body px-4 pt-3 pb-2 text-center">
+                        <button class="btn btn-light border rounded-pill px-4 py-2 fw-bold mb-3 shadow-sm" onclick="document.getElementById('hiddenFileInput').click()">
+                            + CHỌN ẢNH TỪ MÁY
+                        </button>
+                        <input type="file" id="hiddenFileInput" class="d-none" accept="image/*" multiple onchange="handleFileSelection(event)">
+                        <div class="row g-2 mt-2 text-start" id="previewGrid"></div>
+                    </div>
+                    <div class="modal-footer border-0 pt-0 mt-3 px-4 pb-4">
+                        <button type="button" class="btn btn-primary w-100 rounded-pill fw-bold py-3 shadow-sm" onclick="confirmUploadPhotos()">XÁC NHẬN ĐĂNG ẢNH</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+</div>
+{% endwith %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const canEdit = "{{ can_edit }}" === "True";
+    const classId = '{{ target_class.id }}';
+    const targetDate = '{{ target_date|date:"Y-m-d" }}';
+
+    function showToast(message, isSuccess = true) {
+        const toastEl = document.getElementById('liveToast');
+        const msgEl = document.getElementById('toastMessage');
+        toastEl.className = `toast align-items-center text-white border-0 mb-2 w-100 shadow-lg ${isSuccess ? 'bg-success' : 'bg-danger'}`;
+        msgEl.innerHTML = `<i class="bi ${isSuccess ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-2"></i> ${message}`;
+        new bootstrap.Toast(toastEl, { delay: 2000 }).show();
+    }
+
+    function checkEmptyNotes() {
+        const visibleCards = document.querySelectorAll('.note-card-wrapper:not(.d-none)');
+        const msg = document.getElementById('no-present-student-msg');
+        if(visibleCards.length === 0 && msg) msg.classList.remove('d-none');
+        else if(msg) msg.classList.add('d-none');
+    }
+
+    if (canEdit) {
+        window.toggleAttendance = function(btn) {
+            const studentId = btn.getAttribute('data-student-id');
+            const currentStatus = btn.getAttribute('data-status');
+            const newStatus = currentStatus === 'absent' ? 'present' : 'absent';
+            
+            fetch('/api/attendance/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ 'student_id': studentId, 'class_id': classId, 'date': targetDate, 'status': newStatus })
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'success') {
+                    showToast("Đã cập nhật!");
+                    btn.setAttribute('data-status', newStatus);
+                    if (newStatus === 'present') {
+                        btn.className = 'btn rounded-pill fw-bold shadow-sm attendance-btn btn-success';
+                        btn.innerHTML = 'Có mặt';
+                        document.getElementById('note-card-' + studentId).classList.remove('d-none');
+                    } else {
+                        btn.className = 'btn rounded-pill fw-bold shadow-sm attendance-btn btn-danger';
+                        btn.innerHTML = 'Vắng';
+                        document.getElementById('note-card-' + studentId).classList.add('d-none');
+                    }
+                    checkEmptyNotes();
+                } else showToast("Lỗi: " + data.message, false);
+            });
+        }
+
+        window.openNoteModal = function(id, name) {
+            document.getElementById('modalStudentId').value = id;
+            document.getElementById('noteModalTitle').innerText = 'Nhận xét: ' + name;
+            let currentNote = document.getElementById('display-note-' + id).innerText;
+            if(currentNote === 'Chưa nhận xét...') currentNote = '';
+            document.getElementById('modalNoteText').value = currentNote;
+            new bootstrap.Modal(document.getElementById('noteModal')).show();
+        }
+
+        window.addSuggestion = function(text) {
+            const textarea = document.getElementById('modalNoteText');
+            textarea.value = textarea.value ? textarea.value + ' ' + text : text;
+        }
+
+        window.saveNote = function() {
+            const studentId = document.getElementById('modalStudentId').value;
+            const noteText = document.getElementById('modalNoteText').value;
+
+            fetch('/api/save_note/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ 'student_id': studentId, 'class_id': classId, 'date': targetDate, 'note': noteText })
+            }).then(res => res.json()).then(data => {
+                if(data.status === 'success') {
+                    bootstrap.Modal.getInstance(document.getElementById('noteModal')).hide();
+                    document.getElementById('display-note-' + studentId).innerText = noteText || 'Chưa nhận xét...';
+                    showToast("Đã lưu nhận xét.");
+                } else showToast("Lỗi: " + data.message, false);
+            });
+        }
+
+        window.autoSaveLessonContent = function(content) {
+            if (!content.trim()) return;
+            fetch('/api/save_lesson_content/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ 'class_id': classId, 'date': targetDate, 'content': content })
+            }).then(res => { if(res.ok) showToast("Đã lưu nội dung giảng dạy."); });
+        }
+
+        window.pendingFiles = [];
+
+        window.handleFileSelection = function(event) {
+            const files = event.target.files;
+            for (let i = 0; i < files.length; i++) {
+                if (pendingFiles.length >= 10) {
+                    alert("Chỉ được chọn tối đa 10 ảnh!");
+                    break;
+                }
+                pendingFiles.push(files[i]);
+            }
+            renderPreviewGrid();
+            document.getElementById('hiddenFileInput').value = ''; 
+        }
+
+        window.removeFile = function(index) {
+            pendingFiles.splice(index, 1);
+            renderPreviewGrid();
+        }
+
+        window.renderPreviewGrid = function() {
+            const grid = document.getElementById('previewGrid');
+            grid.innerHTML = '';
+            pendingFiles.forEach((file, index) => {
+                let reader = new FileReader();
+                reader.onload = function(e) {
+                    grid.innerHTML += `
+                    <div class="col-4 col-md-3 position-relative">
+                        <img src="${e.target.result}" class="img-fluid rounded-3 shadow-sm border" style="height: 120px; width: 100%; object-fit: cover;">
+                        <button class="btn btn-danger btn-sm rounded-circle position-absolute" 
+                                style="top: 5px; right: 10px; width: 25px; height: 25px; display: flex; align-items: center; justify-content: center; padding: 0;"
+                                onclick="removeFile(${index})">
+                            <i class="bi bi-x fw-bold"></i>
+                        </button>
+                    </div>`;
+                }
+                reader.readAsDataURL(file);
+            });
+        }
+
+        window.confirmUploadPhotos = function() {
+            if(pendingFiles.length === 0) { alert("Vui lòng chọn ít nhất 1 ảnh!"); return; }
+
+            let formData = new FormData();
+            formData.append('class_id', classId);
+            formData.append('date', targetDate);
+            pendingFiles.forEach(file => formData.append('images', file));
+
+            showToast("Đang tải ảnh lên...", true);
+            fetch('/api/upload_class_images/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': '{{ csrf_token }}' },
+                body: formData
+            }).then(res => {
+                if(res.ok) {
+                    showToast("Đăng ảnh thành công! Đang tải lại...");
+                    bootstrap.Modal.getInstance(document.getElementById('photoModal')).hide();
+                    pendingFiles = []; 
+                    renderPreviewGrid();
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1200);
+                } else showToast("Có lỗi khi đăng ảnh.", false);
+            });
+        }
+    } else {
+        window.toggleAttendance = function() { showToast("Không thể chỉnh sửa ngày quá khứ/tương lai", false); };
+        window.autoSaveLessonContent = function() {};
+    }
+
+    document.addEventListener("DOMContentLoaded", function() { checkEmptyNotes(); });
+</script>
+{% endblock %}
