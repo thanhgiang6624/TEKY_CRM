@@ -148,9 +148,9 @@ JAZZMIN_UI_TWEAKS = {
 # CẤU HÌNH CLOUDINARY LƯU TRỮ ẢNH VĨNH VIỄN
 # ==========================================
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'Dán_Cloud_Name_Vào_Đây',
-    'API_KEY': 'Dán_API_Key_Vào_Đây',
-    'API_SECRET': 'Dán_API_Secret_Vào_Đây'
+    'CLOUD_NAME': 'dk1xw7wsw',
+    'API_KEY': '623999434588719',
+    'API_SECRET': 'f9H8Wy-A9lH1GHFZcTZ2TVG2WXE'
 }
 
 # Sử dụng cú pháp mới của Django để quản lý File Storage
