@@ -40,7 +40,7 @@ INSTALLED_APPS = [
     # THƯ VIỆN BỔ SUNG:
     'django.contrib.humanize',
     
-    # [ĐÃ THÊM] THƯ VIỆN LƯU TRỮ ẢNH ĐÁM MÂY:
+    # THƯ VIỆN LƯU TRỮ ẢNH ĐÁM MÂY:
     'cloudinary_storage',
     'cloudinary',
 ]
@@ -80,7 +80,7 @@ WSGI_APPLICATION = 'teky_crm.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-# [ĐÃ SỬA] Tự động nhận diện Database (Dùng PostgreSQL cục bộ nếu chạy ở máy, dùng DB của Render nếu ở trên mạng)
+# Tự động nhận diện Database (Dùng PostgreSQL cục bộ nếu chạy ở máy, dùng DB của Render nếu ở trên mạng)
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -126,7 +126,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 STATIC_URL = 'static/'
 
-# [BẮT BUỘC CHO RENDER] Cấu hình thư mục chứa file tĩnh khi build
+# Cấu hình thư mục chứa file tĩnh khi build
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 AUTH_USER_MODEL = 'accounts.CustomUser'
@@ -162,6 +162,9 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
+
+# Bỏ qua lỗi thiếu file .map của Whitenoise
+WHITENOISE_MANIFEST_STRICT = False
 
 # (Tuỳ chọn: Nếu vẫn muốn giữ biến để lỡ sau này muốn code tham chiếu đến đường dẫn Local thì thêm lại 2 dòng này)
 MEDIA_URL = '/media/'
